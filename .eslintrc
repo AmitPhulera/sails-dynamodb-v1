@@ -1,30 +1,15 @@
 {
-  //   ╔═╗╔═╗╦  ╦╔╗╔╔╦╗┬─┐┌─┐
-  //   ║╣ ╚═╗║  ║║║║ ║ ├┬┘│
-  //  o╚═╝╚═╝╩═╝╩╝╚╝ ╩ ┴└─└─┘
-  // A set of basic conventions for use within any arbitrary Node.js package --
-  // inside or outside the Sails framework.  For the master copy of this file,
-  // see the `.eslintrc` template file in the `sails-generate` package
-  // (https://www.npmjs.com/package/sails-generate.)
-  // Designed for ESLint v4.
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-  // For more information about any of the rules below, check out the relevant
-  // reference page on eslint.org.  For example, to get details on "no-sequences",
-  // you would visit `http://eslint.org/docs/rules/no-sequences`.  If you're unsure
-  // or could use some advice, come by https://sailsjs.com/support.
-  // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
   "env": {
-    "node": true
+    "node": true,
+    "es6": true
   },
 
   "parserOptions": {
-    "ecmaVersion": 8
+    "ecmaVersion": 2019
   },
 
   "globals": {
     "Promise": true
-    // ^^Available since Node v4
   },
 
   "rules": {

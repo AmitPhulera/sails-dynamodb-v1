@@ -8,7 +8,10 @@
     "pretest": "npm run lint",
     "lint": "node ./node_modules/eslint/bin/eslint . --max-warnings=0"
   },
-  "repository": {"type":"git","url":"git://github.com/amit/sails-dynamodb-v1.git"},
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/amit/sails-dynamodb-v1.git"
+  },
   "keywords": [
     "dynamodb-v1",
     "adapter",
@@ -21,7 +24,8 @@
   "author": "amit",
   "license": "MIT",
   "dependencies": {
-    "@sailshq/lodash": "^3.10.2"
+    "@sailshq/lodash": "^3.10.2",
+    "aws-sdk": "^2.517.0"
   },
   "devDependencies": {
     "eslint": "3.19.0",
