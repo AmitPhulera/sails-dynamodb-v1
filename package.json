@@ -1,0 +1,39 @@
+{
+  "name": "sails-dynamodb-v1",
+  "version": "1.0.0",
+  "description": "A dynamodb-v1 adapter for Sails / Waterline",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test/run-standard-tests",
+    "pretest": "npm run lint",
+    "lint": "node ./node_modules/eslint/bin/eslint . --max-warnings=0"
+  },
+  "repository": {"type":"git","url":"git://github.com/amit/sails-dynamodb-v1.git"},
+  "keywords": [
+    "dynamodb-v1",
+    "adapter",
+    "sails",
+    "sails.js",
+    "waterline",
+    "orm",
+    "database-adapter"
+  ],
+  "author": "amit",
+  "license": "MIT",
+  "dependencies": {
+    "@sailshq/lodash": "^3.10.2"
+  },
+  "devDependencies": {
+    "eslint": "3.19.0",
+    "waterline-adapter-tests": "^1.0.0-6"
+  },
+  "waterlineAdapter": {
+    "type": "dynamodb-v1",
+    "interfaces": [
+      "semantic",
+      "queryable",
+      "associations"
+    ],
+    "features": []
+  }
+}
