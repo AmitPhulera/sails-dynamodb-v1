@@ -9,7 +9,7 @@ const DYNAMO_TYPES = {
   json: 'M',
   map: 'M',
   array: 'L',
-  list:'L',
+  list: 'L',
   stringSet: 'SS',
   numberSet: 'NS',
   boolean: 'BOOL',
@@ -51,7 +51,7 @@ module.exports = {
 
     let attributes = Object.keys(definition).map(column => {
       const columnInfo = definition[column];
-      let { columnName, type, description} = columnInfo;
+      let { columnName, type, description } = columnInfo;
       let columnType = columnInfo.autoMigrations.columnType;
       if (type === 'json') {
         type = columnType || 'json';
@@ -61,7 +61,7 @@ module.exports = {
       }
       type = DYNAMO_TYPES[type];
       let attributeObj = { columnName, type };
-      if(!description){
+      if (!description) {
         return attributeObj;
       }
       if (description === 'hash') {
@@ -96,96 +96,113 @@ module.exports = {
     const KeySchema = [];
     const LocalSecondaryIndexes = [];
     const GlobalSecondaryIndexes = [];
-    if (!hashAttribute)
-    {throw Error({ err: `Table ${tableName} must have atleast hash key` });}
-    const AttributeDefinitions = attributes.map(attr => {
-      let { KeyType, type, columnName, rangeKey } = attr;
-      switch (KeyType) {
-        case 'HASH': {
-          KeySchema.push({
-            AttributeName: columnName,
-            KeyType: 'HASH'
-          });
-          break;
+    let lSRangeKeys = [];
+    if (!hashAttribute) {
+      throw Error({ err: `Table ${tableName} must have atleast hash key` });
+    }
+    const AttributeDefinitions = attributes
+      .map(attr => {
+        let { KeyType, type, columnName, rangeKey } = attr;
+        const dynaomoAttr = {
+          AttributeName: columnName,
+          AttributeType: type
+        };
+        if(rangeKey){
+          lSRangeKeys.push(rangeKey);
         }
-        case 'RANGE': {
-          KeySchema.push({
-            AttributeName: columnName,
-            KeyType: 'RANGE'
-          });
-          break;
-        }
-        case 'LocalSecondary': {
-          LocalSecondaryIndexes.push({
-            IndexName: `${hashAttribute}_${columnName}_local_index`,
-            KeySchema: [
-              {
-                AttributeName: hashAttribute,
-                KeyType: 'HASH'
-              },
-              {
-                AttributeName: columnName,
-                KeyType: 'RANGE'
-              }
-            ],
-            Projection: {
-              ProjectionType: 'ALL'
-            }
-          });
-          break;
-        }
-        case 'GlobalSecondary': {
-          if (rangeKey) {
-            GlobalSecondaryIndexes.push({
-              IndexName: `${columnName}_${rangeKey}_global_index`,
+        switch (KeyType) {
+          case 'HASH': {
+            KeySchema.push({
+              AttributeName: columnName,
+              KeyType: 'HASH'
+            });
+            return dynaomoAttr;
+          }
+          case 'RANGE': {
+            KeySchema.push({
+              AttributeName: columnName,
+              KeyType: 'RANGE'
+            });
+            return dynaomoAttr;
+          }
+          case 'LocalSecondary': {
+            LocalSecondaryIndexes.push({
+              IndexName: `${hashAttribute}_${columnName}_local_index`,
               KeySchema: [
                 {
-                  AttributeName: columnName,
+                  AttributeName: hashAttribute,
                   KeyType: 'HASH'
                 },
                 {
-                  AttributeName: rangeKey,
+                  AttributeName: columnName,
                   KeyType: 'RANGE'
                 }
               ],
               Projection: {
                 ProjectionType: 'ALL'
-              },
-              ProvisionedThroughput: {
-                ReadCapacityUnits: 1, /* required */
-                WriteCapacityUnits: 1 /* required */
               }
             });
-          }else{
-            GlobalSecondaryIndexes.push({
-              IndexName: `${columnName}_global_index`,
-              KeySchema: [
-                {
-                  AttributeName: columnName,
-                  KeyType: 'HASH'
-                }
-              ],
-              Projection: {
-                ProjectionType: 'ALL'
-              },
-              ProvisionedThroughput: {
-                ReadCapacityUnits: 1, /* required */
-                WriteCapacityUnits: 1 /* required */
-              }
-            });
+            return dynaomoAttr;
           }
-          break;
+          case 'GlobalSecondary': {
+            if (rangeKey) {
+              GlobalSecondaryIndexes.push({
+                IndexName: `${columnName}_${rangeKey}_global_index`,
+                KeySchema: [
+                  {
+                    AttributeName: columnName,
+                    KeyType: 'HASH'
+                  },
+                  {
+                    AttributeName: rangeKey,
+                    KeyType: 'RANGE'
+                  }
+                ],
+                Projection: {
+                  ProjectionType: 'ALL'
+                },
+                ProvisionedThroughput: {
+                  ReadCapacityUnits: 1,
+                  WriteCapacityUnits: 1
+                }
+              });
+            } else {
+              GlobalSecondaryIndexes.push({
+                IndexName: `${columnName}_global_index`,
+                KeySchema: [
+                  {
+                    AttributeName: columnName,
+                    KeyType: 'HASH'
+                  }
+                ],
+                Projection: {
+                  ProjectionType: 'ALL'
+                },
+                ProvisionedThroughput: {
+                  ReadCapacityUnits: 1 /* required */,
+                  WriteCapacityUnits: 1 /* required */
+                }
+              });
+            }
+            return dynaomoAttr;
+          }
+          default: {
+            return undefined;
+          }
         }
-        default:{
-          return undefined;
+      })
+      .filter(Boolean);
+    if (lSRangeKeys.length >= 1) {
+      attributes.map(attr => {
+        if (lSRangeKeys.indexOf(attr.columnName) !== -1) {
+          let { type, columnName } = attr;
+          AttributeDefinitions.push({
+            AttributeName: columnName,
+            AttributeType: type
+          });
         }
-      };
-      const dAttr = {
-        AttributeName: columnName,
-        AttributeType: type
-      };
-      return dAttr;
-    }).filter(Boolean);
+      });
+    }
     let schemaObj = {
       TableName,
       AttributeDefinitions,

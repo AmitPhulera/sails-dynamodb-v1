@@ -2,9 +2,9 @@
  * Module dependencies
  */
 
-const _ = require("@sailshq/lodash");
-const AWS = require("aws-sdk");
-const util = require("./utils/app.util");
+const _ = require('@sailshq/lodash');
+const AWS = require('aws-sdk');
+const util = require('./utils/app.util');
 /**
  * Module state
  */
@@ -41,7 +41,7 @@ var registeredDatastores = {};
  */
 module.exports = {
   // The identity of this adapter, to be referenced by datastore configurations in a Sails app.
-  identity: "dynamodb-v-1",
+  identity: 'dynamodb-v-1',
 
   // Waterline Adapter API Version
   //
@@ -125,55 +125,65 @@ module.exports = {
     if (registeredDatastores[datastoreName]) {
       return done(
         new Error(
-          "Consistency violation: Cannot register datastore: `" +
+          'Consistency violation: Cannot register datastore: `' +
             datastoreName +
-            "`, because it is already registered with this adapter!  This could be due to an unexpected race condition in userland code (e.g. attempting to initialize Waterline more than once), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`, because it is already registered with this adapter!  This could be due to an unexpected race condition in userland code (e.g. attempting to initialize Waterline more than once), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
     if (!datastoreConfig.accessKeyId || !datastoreConfig.secretAccessKey) {
       return done(
         new Error(
-          "Improper configuration of Dynamo Adaptor.\naccessKeyId or secretAccessKey missing\n.Please verfiy your settings in config/datastores.js   "
+          'Improper configuration of Dynamo Adaptor.\naccessKeyId or secretAccessKey missing\n.Please verfiy your settings in config/datastores.js   '
         )
       );
     }
 
-    // Ensure a `url` was configured.
-    // > To help standardize configuration for end users, adapter authors
-    // > are encouraged to support the `url` setting, if conceivable.
-    // >
-    // > Read more here:
-    // > https://sailsjs.com/config/datastores#?the-connection-url
-    
-
     const dynamoDb = new AWS.DynamoDB({
-      region: "us-west-1"
+      region: 'us-west-1'
     });
-    const tableList = await dynamoDb.listTables().promise();
-    const existingTables = tableList.TableNames;
-    const configuredTables = Object.keys(physicalModelsReport).map(key => {
-      const schema = physicalModelsReport[key];
-      const { tableName } = schema;
-      return tableName;
+    const client = new AWS.DynamoDB.DocumentClient({
+      region: 'us-west-1'
     });
-    const $tableCreate = util
-      .diff(configuredTables, existingTables)
-      .map(tableName => util.getDynamoProperties(physicalModelsReport, tableName))
-      .map(util.prepareCreateTableQuery)
-      .map(queryObj => dynamoDb.createTable(queryObj).promise());
-    await Promise.all($tableCreate);
-    console.log("Table created")
+    try {
+      const tableList = await dynamoDb.listTables().promise();
+      const existingTables = tableList.TableNames;
+      const configuredTables = Object.keys(physicalModelsReport).map(key => {
+        const schema = physicalModelsReport[key];
+        const { tableName } = schema;
+        return tableName;
+      });
+      const $tableCreate = util
+        .diff(configuredTables, existingTables)
+        .map(tableName =>
+          util.getDynamoProperties(physicalModelsReport, tableName)
+        ).map(schema =>{
+          let {tableName, attributes} = schema;
+          registeredDatastores[tableName]={};
+          let tableConfig = registeredDatastores[tableName];
+          attributes.forEach(element => {
+            const {type, KeyType, rangeKey, columnName} = element;
+            tableConfig[columnName] = {type,KeyType,rangeKey};
+          });
+          return schema;
+        })
+        .map(util.prepareCreateTableQuery)
+        .map(queryObj => dynamoDb.createTable(queryObj).promise());
+      await Promise.all($tableCreate);
+      
       // console.log(toBeCreated);
-    // Build a "connection manager" -- an object that contains all of the state for this datastore.
-    // This might be a MySQL connection pool, a Mongo client instance (`db`), or something even simpler.
-    // For example, in sails-postgresql, `manager` encapsulates a connection pool that the stateless
-   // manager is completely dependent on this adapter.  In other words, it is custom and database-specific.
-    // This is where you should store any custom metadata specific to this datastore.
-    //
-    // > TODO: Replace this setTimeout with real logic that creates the manager.
+      // Build a "connection manager" -- an object that contains all of the state for this datastore.
+      // This might be a MySQL connection pool, a Mongo client instance (`db`), or something even simpler.
+      // For example, in sails-postgresql, `manager` encapsulates a connection pool that the stateless
+      // manager is completely dependent on this adapter.  In other words, it is custom and database-specific.
+      // This is where you should store any custom metadata specific to this datastore.
+      //
+      // > TODO: Replace this setTimeout with real logic that creates the manager.
 
-    return done();
+      return done();
+    } catch (err) {
+      return done(Error(err));
+    }
     setTimeout(() => {
       var manager; //<< (see the other TODO just above here)
 
@@ -222,15 +232,16 @@ module.exports = {
    */
   teardown: function(datastoreName, done) {
     // Look up the datastore entry (manager/driver/config).
+    return done();
     var dsEntry = registeredDatastores[datastoreName];
 
     // Sanity check:
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Attempting to tear down a datastore (`" +
+          'Consistency violation: Attempting to tear down a datastore (`' +
             datastoreName +
-            "`) which is not currently registered with this adapter.  This is usually due to a race condition in userland code (e.g. attempting to tear down the same ORM instance more than once), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) which is not currently registered with this adapter.  This is usually due to a race condition in userland code (e.g. attempting to tear down the same ORM instance more than once), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -289,9 +300,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -302,7 +313,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`create`) not implemented yet."));
+      return done(new Error('Adapter method (`create`) not implemented yet.'));
     }, 16);
   },
 
@@ -333,9 +344,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -347,7 +358,7 @@ module.exports = {
     // > adapter altogether
     setTimeout(() => {
       return done(
-        new Error("Adapter method (`createEach`) not implemented yet.")
+        new Error('Adapter method (`createEach`) not implemented yet.')
       );
     }, 16);
   },
@@ -379,9 +390,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -392,7 +403,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`update`) not implemented yet."));
+      return done(new Error('Adapter method (`update`) not implemented yet.'));
     }, 16);
   },
 
@@ -423,9 +434,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -436,7 +447,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`destroy`) not implemented yet."));
+      return done(new Error('Adapter method (`destroy`) not implemented yet.'));
     }, 16);
   },
 
@@ -475,9 +486,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -488,7 +499,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`find`) not implemented yet."));
+      return done(new Error('Adapter method (`find`) not implemented yet.'));
     }, 16);
   },
 
@@ -522,9 +533,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -535,7 +546,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`join`) not implemented yet."));
+      return done(new Error('Adapter method (`join`) not implemented yet.'));
     }, 16);
   },
 
@@ -561,9 +572,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -574,7 +585,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`count`) not implemented yet."));
+      return done(new Error('Adapter method (`count`) not implemented yet.'));
     }, 16);
   },
 
@@ -599,9 +610,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -612,7 +623,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`sum`) not implemented yet."));
+      return done(new Error('Adapter method (`sum`) not implemented yet.'));
     }, 16);
   },
 
@@ -637,9 +648,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -650,7 +661,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`avg`) not implemented yet."));
+      return done(new Error('Adapter method (`avg`) not implemented yet.'));
     }, 16);
   },
 
@@ -691,9 +702,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -704,7 +715,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`define`) not implemented yet."));
+      return done(new Error('Adapter method (`define`) not implemented yet.'));
     }, 16);
   },
 
@@ -732,9 +743,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -745,7 +756,7 @@ module.exports = {
     // > `done()` when finished. (Or remove this method from the
     // > adapter altogether
     setTimeout(() => {
-      return done(new Error("Adapter method (`drop`) not implemented yet."));
+      return done(new Error('Adapter method (`drop`) not implemented yet.'));
     }, 16);
   },
 
@@ -777,9 +788,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          "Consistency violation: Cannot do that with datastore (`" +
+          'Consistency violation: Cannot do that with datastore (`' +
             datastoreName +
-            "`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"
+            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
         )
       );
     }
@@ -791,7 +802,7 @@ module.exports = {
     // > adapter altogether
     setTimeout(() => {
       return done(
-        new Error("Adapter method (`setSequence`) not implemented yet.")
+        new Error('Adapter method (`setSequence`) not implemented yet.')
       );
     }, 16);
   }
