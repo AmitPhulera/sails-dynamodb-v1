@@ -145,31 +145,22 @@ module.exports = {
     // >
     // > Read more here:
     // > https://sailsjs.com/config/datastores#?the-connection-url
-    if (!datastoreConfig.url) {
-      return done(
-        new Error(
-          "Invalid configuration for datastore `" +
-            datastoreName +
-            "`:  Missing `url` (See https://sailsjs.com/config/datastores#?the-connection-url for more info.)"
-        )
-      );
-    }
+    
 
     const dynamoDb = new AWS.DynamoDB({
       region: "us-west-1"
     });
     const tableList = await dynamoDb.listTables().promise();
-    const { TableNames } = tableList;
+    const existingTables = tableList.TableNames;
     const configuredTables = Object.keys(physicalModelsReport).map(key => {
       const schema = physicalModelsReport[key];
       const { tableName } = schema;
       return tableName;
     });
-    console.log(configuredTables, TableNames);
     const $tableCreate = util
-      .diff(configuredTables, TableNames)
-      .map(table => util.getDynamoProperties(physicalModelsReport, table))
-      .map(util.prepareCreateQuery)
+      .diff(configuredTables, existingTables)
+      .map(tableName => util.getDynamoProperties(physicalModelsReport, tableName))
+      .map(util.prepareCreateTableQuery)
       .map(queryObj => dynamoDb.createTable(queryObj).promise());
     await Promise.all($tableCreate);
     console.log("Table created")
@@ -177,8 +168,7 @@ module.exports = {
     // Build a "connection manager" -- an object that contains all of the state for this datastore.
     // This might be a MySQL connection pool, a Mongo client instance (`db`), or something even simpler.
     // For example, in sails-postgresql, `manager` encapsulates a connection pool that the stateless
-    // `machinepack-postgresql` driver uses to communicate with the database.  The actual form of the
-    // manager is completely dependent on this adapter.  In other words, it is custom and database-specific.
+   // manager is completely dependent on this adapter.  In other words, it is custom and database-specific.
     // This is where you should store any custom metadata specific to this datastore.
     //
     // > TODO: Replace this setTimeout with real logic that creates the manager.

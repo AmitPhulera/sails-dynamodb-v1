@@ -26,8 +26,9 @@ module.exports = {
     if (!Array.isArray(A) || !Array.isArray(B)) {
       throw Error({ err: 'Array or Set expected as input in diff' });
     }
-    const s = new Set(...B);
-    return A.filter(x => !s.has(x));
+    const s = new Set(B);
+    let res = A.filter(x => !s.has(x));
+    return res;
   },
   // LocalSecondary Index ka array banega
   // [{
@@ -58,6 +59,7 @@ module.exports = {
       if (type === 'string' && columnType === 'binary') {
         type = columnType;
       }
+      type = DYNAMO_TYPES[type];
       let attributeObj = { columnName, type };
       if(!description){
         return attributeObj;
@@ -88,7 +90,7 @@ module.exports = {
    * @description returns an object which is adequate to be passed to dynamo's createtable function.
    * @returns {Object}
    */
-  prepareCreateQuery: tableInfo => {
+  prepareCreateTableQuery: tableInfo => {
     const { hashAttribute, attributes, tableName } = tableInfo;
     const TableName = tableName;
     const KeySchema = [];
@@ -148,6 +150,10 @@ module.exports = {
               ],
               Projection: {
                 ProjectionType: 'ALL'
+              },
+              ProvisionedThroughput: {
+                ReadCapacityUnits: 1, /* required */
+                WriteCapacityUnits: 1 /* required */
               }
             });
           }else{
@@ -161,27 +167,33 @@ module.exports = {
               ],
               Projection: {
                 ProjectionType: 'ALL'
+              },
+              ProvisionedThroughput: {
+                ReadCapacityUnits: 1, /* required */
+                WriteCapacityUnits: 1 /* required */
               }
             });
           }
           break;
         }
         default:{
-          break;
+          return undefined;
         }
       };
-      if(!DYNAMO_TYPES[type])
-        console.log(type);
       const dAttr = {
         AttributeName: columnName,
-        AttributeType: DYNAMO_TYPES[type]
+        AttributeType: type
       };
       return dAttr;
-    });
+    }).filter(Boolean);
     let schemaObj = {
       TableName,
       AttributeDefinitions,
-      KeySchema
+      KeySchema,
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 1,
+        WriteCapacityUnits: 1
+      }
     };
     if (LocalSecondaryIndexes.length !== 0) {
       schemaObj.LocalSecondaryIndexes = LocalSecondaryIndexes;
