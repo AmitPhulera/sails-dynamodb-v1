@@ -2,7 +2,8 @@
  * @module utils
  * @description Helper functions for the app.js
  */
-
+const AWS = require('aws-sdk');
+const client = new AWS.DynamoDB.DocumentClient();
 const DYNAMO_TYPES = {
   string: 'S',
   number: 'N',
@@ -14,6 +15,11 @@ const DYNAMO_TYPES = {
   numberSet: 'NS',
   boolean: 'BOOL',
   binary: 'B'
+};
+const BATCH_FORMAT = {
+  PutRequest: {
+    Item: {}
+  }
 };
 module.exports = {
   /**
@@ -36,14 +42,14 @@ module.exports = {
   //
   // }]
   /**
-   * @function utils.getDynamoProperties
+   * @function utils.getDynamoConfig
    * @param {Object} sailsSchema schema object for all the datastores configured
    * @param {string} table name of the table
    * @return {Object}
    * @description Extracts the properties from sails schema that are required to create dynamo table like tablename,
    * hashKey,rangeKey,secondaryKey
    */
-  getDynamoProperties: (sailsSchema, table) => {
+  getDynamoConfig: (sailsSchema, table) => {
     const schema = sailsSchema[table];
     const { definition, tableName } = schema;
     let hashAttribute;
@@ -107,7 +113,7 @@ module.exports = {
           AttributeName: columnName,
           AttributeType: type
         };
-        if(rangeKey){
+        if (rangeKey) {
           lSRangeKeys.push(rangeKey);
         }
         switch (KeyType) {
@@ -219,5 +225,65 @@ module.exports = {
       schemaObj.GlobalSecondaryIndexes = GlobalSecondaryIndexes;
     }
     return schemaObj;
-  }
+  },
+  /**
+   * @function utils.populateDataStore
+   * @param {Object} dataStore Sails adapter data store object which will be populated
+   * @param {Object} schema schema of the table as defined in models
+   * @description Populates the registeredDataStores global variable present
+   */
+  populateDataStore: (dataStore, schema) => {
+    let { tableName, attributes } = schema;
+    dataStore[tableName] = {};
+    let tableConfig = dataStore[tableName];
+    attributes.forEach(element => {
+      const { type, KeyType, rangeKey, columnName } = element;
+      tableConfig[columnName] = { type, KeyType, rangeKey };
+    });
+    return schema;
+  },
+  /**
+   * @function util.createDynaoItems
+   * @param {object} record
+   * @param {schema} schema
+   * @description Removes empty values and undefined values from the
+   * record object and call createSet function for datatypes Number Set
+   * and String Set.
+   */
+  createDynamoItem: (record, schema) => {
+    const Item = {};
+    for (const attribute in record) {
+      const { type } = schema[attribute];
+      const value = record[attribute];
+      if (value !== '' && value !== undefined) {
+        Item[attribute] = value;
+      }
+      if (type === 'SS' || type === 'NS') {
+        Item[attribute] = client.createSet(value);
+      }
+    }
+    return Item;
+  },
+  createBatch: function(Items) {
+    const batchedItems = [];
+    let batchArr = [];
+    for (let i = 1; i <= Items.length; i++) {
+      const Item = Items[i - 1];
+      if (i % 15 === 0 || i === Items.length) {
+        batchedItems.push(batchArr);
+        batchArr = [];
+      }
+      batchArr.push(this.batchObj(Item));
+    }
+    return batchedItems;
+  },
+  batchObj: Item => {
+    return {
+      PutRequest: {
+        Item
+      }
+    };
+  },
+  deepClone: obj => JSON.parse(JSON.stringify(obj)),
+    
 };

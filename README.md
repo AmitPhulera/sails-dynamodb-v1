@@ -16,6 +16,10 @@ $ npm install sails-dynamodb-v1
 
 ## Configuring Models
 
+SailsJS creates an archive models by default, it is recommended that you disable it by setting 'archiveModelIdentity' property to false in config/models.js
+
+And sails appends three default keys as id, createdAt and updatedAt in each and every model you define. If you want to disable those fields they can be removed from 'attributes' key in config/models.js
+
 ### Types
 
 Since sails from version 1 supports only 4 types i.e string,number,json and boolean, so to accomodate all the types we have to use combination of columnType key and type key in models to set attribute's type.
@@ -88,18 +92,18 @@ This adapter implements the following methods:
 
 | Method            | Status            | Category  |
 | :---------------- | :---------------- | :-------- |
-| registerDatastore | _**in progress**_ | LIFECYCLE |
-| teardown          | _**in progress**_ | LIFECYCLE |
-| create            | Planned           | DML       |
+| registerDatastore | __done__ | LIFECYCLE |
+| teardown          | __done__ | LIFECYCLE |
+| create            | __in progress__           | DML       |
 | createEach        | Planned           | DML       |
 | update            | Planned           | DML       |
 | destroy           | Planned           | DML       |
 | find              | Planned           | DQL       |
 | join              | _**???**_         | DQL       |
 | count             | Planned           | DQL       |
-| sum               | Planned           | DQL       |
-| avg               | Planned           | DQL       |
-| define            | Planned           | DDL       |
+| sum               | __NO USE__           | DQL       |
+| avg               | __NO USE__           | DQL       |
+| define            | __NO USE__           | DDL       |
 | drop              | Planned           | DDL       |
 | setSequence       | _**???**_         | DDL       |
 

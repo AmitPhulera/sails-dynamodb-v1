@@ -5,6 +5,12 @@
 const _ = require('@sailshq/lodash');
 const AWS = require('aws-sdk');
 const util = require('./utils/app.util');
+const dynamoDb = new AWS.DynamoDB({
+  region: 'us-west-1'
+});
+const client = new AWS.DynamoDB.DocumentClient({
+  region: 'us-west-1'
+});
 /**
  * Module state
  */
@@ -41,7 +47,7 @@ var registeredDatastores = {};
  */
 module.exports = {
   // The identity of this adapter, to be referenced by datastore configurations in a Sails app.
-  identity: 'dynamodb-v-1',
+  identity: 'dynamodb-v1',
 
   // Waterline Adapter API Version
   //
@@ -138,39 +144,28 @@ module.exports = {
         )
       );
     }
-
-    const dynamoDb = new AWS.DynamoDB({
-      region: 'us-west-1'
-    });
-    const client = new AWS.DynamoDB.DocumentClient({
-      region: 'us-west-1'
-    });
     try {
+      // get tables
+      // from existing tables create dynamo Schema
+      // save schema to datastores
+      // get tables that have not been created
+      // create the tables
       const tableList = await dynamoDb.listTables().promise();
-      const existingTables = tableList.TableNames;
+      const existingTables = new Set(tableList.TableNames);
       const configuredTables = Object.keys(physicalModelsReport).map(key => {
         const schema = physicalModelsReport[key];
         const { tableName } = schema;
         return tableName;
       });
-      const $tableCreate = util
-        .diff(configuredTables, existingTables)
-        .map(tableName =>
-          util.getDynamoProperties(physicalModelsReport, tableName)
-        ).map(schema =>{
-          let {tableName, attributes} = schema;
-          registeredDatastores[tableName]={};
-          let tableConfig = registeredDatastores[tableName];
-          attributes.forEach(element => {
-            const {type, KeyType, rangeKey, columnName} = element;
-            tableConfig[columnName] = {type,KeyType,rangeKey};
-          });
-          return schema;
-        })
+      const $tableCreate = configuredTables
+        .map(tableName => util.getDynamoConfig(physicalModelsReport, tableName))
+        .map(schema => util.populateDataStore(registeredDatastores, schema))
+        .filter(schema => !existingTables.has(schema.tableName))
         .map(util.prepareCreateTableQuery)
         .map(queryObj => dynamoDb.createTable(queryObj).promise());
+      console.log(registeredDatastores);
       await Promise.all($tableCreate);
-      
+
       // console.log(toBeCreated);
       // Build a "connection manager" -- an object that contains all of the state for this datastore.
       // This might be a MySQL connection pool, a Mongo client instance (`db`), or something even simpler.
@@ -179,7 +174,11 @@ module.exports = {
       // This is where you should store any custom metadata specific to this datastore.
       //
       // > TODO: Replace this setTimeout with real logic that creates the manager.
-
+      // registeredDatastores[datastoreName] = {
+      //   config: datastoreConfig,
+      //   manager: client,
+      //   //driver: undefined // << TODO: include driver here (if relevant)
+      // };
       return done();
     } catch (err) {
       return done(Error(err));
@@ -292,30 +291,28 @@ module.exports = {
    *               @param {Dictionary?}
    * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    */
-  create: function(datastoreName, query, done) {
+  create: async function(datastoreName, query, done) {
     // Look up the datastore entry (manager/driver/config).
-    var dsEntry = registeredDatastores[datastoreName];
-    console.log(datastoreName,query)
-    done();
-    // Sanity check:
-    // if (_.isUndefined(dsEntry)) {
-    //   return done(
-    //     new Error(
-    //       'Consistency violation: Cannot do that with datastore (`' +
-    //         datastoreName +
-    //         '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
-    //     )
-    //   );
-    // }
-
-    // Perform the query (and if relevant, send back a result.)
-    //
-    // > TODO: Replace this setTimeout with real logic that calls
-    // > `done()` when finished. (Or remove this method from the
-    // > adapter altogether
-    // setTimeout(() => {
-    //   return done(new Error('Adapter method (`create`) not implemented yet.'));
-    // }, 16);
+    const TableName = query.using;
+    const record = query.newRecord;
+    const schema = registeredDatastores[TableName];
+    if (!schema) {
+      throw new Error({
+        err: `No table registered in models with ${TableName}`
+      });
+    }
+    try {
+      const Item = util.createDynamoItem(record, schema);
+      await client
+        .put({
+          TableName,
+          Item
+        })
+        .promise();
+      return done();
+    } catch (error) {
+      return done(Error(error));
+    }
   },
 
   /**
@@ -337,31 +334,28 @@ module.exports = {
    *               @param {Array?}
    * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    */
-  createEach: function(datastoreName, query, done) {
-    // Look up the datastore entry (manager/driver/config).
-    var dsEntry = registeredDatastores[datastoreName];
-
-    // Sanity check:
-    if (_.isUndefined(dsEntry)) {
-      return done(
-        new Error(
-          'Consistency violation: Cannot do that with datastore (`' +
-            datastoreName +
-            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
-        )
-      );
+  createEach: async function(datastoreName, query, done) {
+    const TableName = query.using;
+    const records = query.newRecords;
+    const schema = registeredDatastores[TableName];
+    if (!schema) {
+      throw new Error({
+        err: `No table registered in models with ${TableName}`
+      });
     }
-
-    // Perform the query (and if relevant, send back a result.)
-    //
-    // > TODO: Replace this setTimeout with real logic that calls
-    // > `done()` when finished. (Or remove this method from the
-    // > adapter altogether
-    setTimeout(() => {
-      return done(
-        new Error('Adapter method (`createEach`) not implemented yet.')
-      );
-    }, 16);
+    const Items = records.map(record => util.createDynamoItem(record, schema));
+    const batchedItems = util.createBatch(Items);
+    let $query = batchedItems.map(dataArr => {
+      const dQuery = { RequestItems: {} };
+      dQuery.RequestItems[TableName] = dataArr;
+      return client.batchWrite(dQuery).promise();
+    });
+    try {
+      await Promise.all($query);
+      return done();
+    } catch (err) {
+      return done(new Error(err));
+    }
   },
 
   /**

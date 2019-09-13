@@ -4,6 +4,7 @@
   "description": "A dynamodb-v1 adapter for Sails / Waterline",
   "main": "index.js",
   "scripts": {
+    "start": "node app.js",
     "test": "node test/run-standard-tests",
     "pretest": "npm run lint",
     "lint": "node ./node_modules/eslint/bin/eslint . --max-warnings=0"
