@@ -232,29 +232,7 @@ module.exports = {
   teardown: function(datastoreName, done) {
     // Look up the datastore entry (manager/driver/config).
     return done();
-    var dsEntry = registeredDatastores[datastoreName];
-
-    // Sanity check:
-    if (_.isUndefined(dsEntry)) {
-      return done(
-        new Error(
-          'Consistency violation: Attempting to tear down a datastore (`' +
-            datastoreName +
-            '`) which is not currently registered with this adapter.  This is usually due to a race condition in userland code (e.g. attempting to tear down the same ORM instance more than once), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
-        )
-      );
-    }
-
-    // Destroy the manager.
-    //
-    // > TODO: Replace this setTimeout with real logic that destroys the manager.
-    setTimeout(() => {
-      // Now, un-register the datastore.
-      delete registeredDatastores[datastoreName];
-
-      // Inform Waterline that we're done, and that everything went as expected.
-      return done();
-    }, 16);
+   
   },
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -292,7 +270,6 @@ module.exports = {
    * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    */
   create: async function(datastoreName, query, done) {
-    // Look up the datastore entry (manager/driver/config).
     const TableName = query.using;
     const record = query.newRecord;
     const schema = registeredDatastores[TableName];

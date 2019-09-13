@@ -74,6 +74,9 @@ module.exports = {
 - A global secondary index will be created with hash key as country and it's range key as gender.
 
 
+- create uses normal put whereas createEach uses batchPut.
+- Keys that are not specified i.e either are '' or undefined will be filtered out while creating. 
+
 Then [connect the adapter](https://sailsjs.com/documentation/reference/configuration/sails-config-datastores) to one or more of your app's datastores.
 
 ## Usage
