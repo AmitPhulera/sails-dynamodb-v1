@@ -16,11 +16,25 @@ const DYNAMO_TYPES = {
   boolean: 'BOOL',
   binary: 'B'
 };
-const BATCH_FORMAT = {
-  PutRequest: {
-    Item: {}
-  }
+//EQ | NE | IN | LE | LT | GE | GT | BETWEEN | NOT_NULL | NULL | CONTAINS | NOT_CONTAINS | BEGINS_WITH,
+
+//'<''<=''>''>=''!=',nin,in,contains,startsWith,endsWith
+
+const OPERATOR_MAP = {
+  '=': 'EQ',
+  '!=': 'NE',
+  'in': 'IN',
+  '<=': 'LE',
+  '<': 'LT',
+  '>=': 'GE',
+  '>': 'GT',
+  'between':'BETWEEN',
+  'contains': 'CONTAINS',
+  'nin': 'NOT_CONTAINS',
+  'startsWith': 'BEGINS_WITH'
 };
+//special case for not null and null
+
 module.exports = {
   /**
    * @function utils.diff
@@ -81,6 +95,8 @@ module.exports = {
       } else if (description.split('##')[0] === 'global-secondary') {
         attributeObj.KeyType = 'GlobalSecondary';
         let rangeKey = description.split('##')[1];
+        // TODO: add custom index names
+        // let indexName = description.split('##')[2];
         if (typeof rangeKey !== 'undefined') {
           attributeObj.rangeKey = rangeKey;
         }
@@ -133,7 +149,7 @@ module.exports = {
           }
           case 'LocalSecondary': {
             LocalSecondaryIndexes.push({
-              IndexName: `${hashAttribute}_${columnName}_local_index`,
+              IndexName: `${columnName}_local_index`,
               KeySchema: [
                 {
                   AttributeName: hashAttribute,
@@ -264,6 +280,12 @@ module.exports = {
     }
     return Item;
   },
+  /**
+   * @function utils.createBatch
+   * @param {Array} Items
+   * @description for a given array of dynamo records returns a
+   * array of batched records where each batch has 15 records.
+   */
   createBatch: function(Items) {
     const batchedItems = [];
     let batchArr = [];
@@ -284,6 +306,140 @@ module.exports = {
       }
     };
   },
+  /**
+   * @param obj
+   * @description deep clones the JSON object
+   *
+   */
   deepClone: obj => JSON.parse(JSON.stringify(obj)),
+  /**
+   * @param {object} Item Json key value pairs
+   * @description converts the json key value pairs to dynamo query object
+   */
+  createUpdateObject: Item => {
+    const AttributeUpdates = {};
+    Object.keys(Item).map(key => {
+      const val = Item[key];
+      AttributeUpdates[key] = {
+        Action: 'PUT',
+        Value: val
+      };
+    });
+    return AttributeUpdates;
+  },
+  getIndexes: function(schema, query) {
     
+    
+    let queryNature={};
+    const {indexInfo,filterKeys} = this.extractIndexFields(query,schema);
+    
+    if(indexInfo.hash && indexInfo.range){
+      queryNature.type = 'query';
+      queryNature.keys={
+        hash:indexInfo.hash,
+        range:indexInfo.range
+      };
+    }else if(indexInfo.hash && indexInfo.localS){
+      queryNature.type = 'localIndex';
+      queryNature.keys={
+        hash:indexInfo.hash,
+        secondary:indexInfo.localS
+      };
+    }else if(indexInfo.globalS){
+      queryNature.type = 'globalIndex';
+      queryNature.keys={
+        hash:indexInfo.globalS
+      };
+      let {rangeKey} = schema[indexInfo.globalS]; 
+      if(rangeKey && query[rangeKey]){
+        queryNature.keys.range = rangeKey;
+      }
+    }else if(indexInfo.hash){
+      queryNature.type = 'query';
+      queryNature.keys={
+        hash:indexInfo.hash
+      };
+    }else {
+      queryNature.type = 'scan';
+    }
+    console.log(schema);
+    queryNature.filterKeys = filterKeys; 
+    return queryNature;
+  },
+  extractIndexFields: (query, schema) => {
+    let indexInfo = {
+      hash: false,
+      range: false,
+      localS: false,
+      globalS: false
+    };
+    let filterKeys = [];
+    Object.keys(query).forEach(key => {
+      const { KeyType } = schema[key];
+      if (KeyType === 'HASH') {
+        indexInfo.hash = key;
+      } else if (KeyType === 'RANGE') {
+        indexInfo.range = key;
+      } else if (KeyType === 'LocalSecondary') {
+        indexInfo.localS = key;
+      } else if (KeyType === 'GlobalSecondary') {
+        indexInfo.globalS = key;
+      } else {
+        filterKeys.push(key);
+      }
+    });
+    return {indexInfo,filterKeys};
+  },
+  prepareConditions(query, indexInfo){
+    // https://sailsjs.com/documentation/concepts/models-and-orm/query-language
+    // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#query-property
+    // How to get index name?
+    let KeyConditions={};
+    if(Object.keys(indexInfo.keys).length !== 0){
+      let {hash,range} = indexInfo.keys;
+      let attributeValue = query[hash];
+      KeyConditions[hash]=this.dynamoAttribute(attributeValue);
+      if (range){
+        KeyConditions[range]=this.dynamoAttribute(attributeValue);
+      }  
+    }
+    let QueryFilter = indexInfo.filterKeys.reduce((qfilter,attr) => {
+      let attributeValue = query[attr];
+      qfilter[attr] = this.dynamoAttribute(attributeValue);
+      return qfilter;
+    },{});
+    return {QueryFilter,KeyConditions};
+  },
+  dynamoAttribute(attr){
+    let ComparisonOperator = 'EQ';
+    let value = attr;
+    if(typeof attr === 'object' && attr !== null)
+    {
+      //support for multiple operators
+      let operator = Object.keys(attr)[0];
+      value = attr[operator];
+      if( typeof OPERATOR_MAP[operator] === 'undefined'){
+        throw Error(`Operator ${operator} not supported by the adapter`);
+      }
+      ComparisonOperator = OPERATOR_MAP[operator];
+    }
+    const AttributeValueList = Array.isArray(value) ? value : [value];
+    return {AttributeValueList,ComparisonOperator};
+  },
+  normalizeData(entry, schema){
+    Object.keys(entry).forEach(attr=>{
+      if(schema[attr].type === 'SS' || schema[attr].type === 'NS'){
+        entry[attr]=entry[attr].values;
+      }
+    });
+    return entry;
+  }
 };
+/**
+ {
+   <AttributeName>:{
+     ComparisionOperator:<>,
+
+   }
+ }
+ */

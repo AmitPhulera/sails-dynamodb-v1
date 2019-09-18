@@ -118,7 +118,7 @@ module.exports = {
     done
   ) {
     // Grab the unique name for this datastore for easy access below.
-    var datastoreName = datastoreConfig.identity;
+    const datastoreName = datastoreConfig.identity;
 
     // Some sanity checks:
     if (!datastoreName) {
@@ -150,6 +150,7 @@ module.exports = {
       // save schema to datastores
       // get tables that have not been created
       // create the tables
+      registeredDatastores[datastoreName] = {};
       const tableList = await dynamoDb.listTables().promise();
       const existingTables = new Set(tableList.TableNames);
       const configuredTables = Object.keys(physicalModelsReport).map(key => {
@@ -159,57 +160,15 @@ module.exports = {
       });
       const $tableCreate = configuredTables
         .map(tableName => util.getDynamoConfig(physicalModelsReport, tableName))
-        .map(schema => util.populateDataStore(registeredDatastores, schema))
+        .map(schema => util.populateDataStore(registeredDatastores[datastoreName], schema))
         .filter(schema => !existingTables.has(schema.tableName))
         .map(util.prepareCreateTableQuery)
         .map(queryObj => dynamoDb.createTable(queryObj).promise());
-      console.log(registeredDatastores);
       await Promise.all($tableCreate);
-
-      // console.log(toBeCreated);
-      // Build a "connection manager" -- an object that contains all of the state for this datastore.
-      // This might be a MySQL connection pool, a Mongo client instance (`db`), or something even simpler.
-      // For example, in sails-postgresql, `manager` encapsulates a connection pool that the stateless
-      // manager is completely dependent on this adapter.  In other words, it is custom and database-specific.
-      // This is where you should store any custom metadata specific to this datastore.
-      //
-      // > TODO: Replace this setTimeout with real logic that creates the manager.
-      // registeredDatastores[datastoreName] = {
-      //   config: datastoreConfig,
-      //   manager: client,
-      //   //driver: undefined // << TODO: include driver here (if relevant)
-      // };
       return done();
     } catch (err) {
       return done(Error(err));
     }
-    setTimeout(() => {
-      var manager; //<< (see the other TODO just above here)
-
-      // Save information about the datastore to the `datastores` dictionary, keyed under
-      // the datastore's unique name.  The information should itself be in the form of a
-      // dictionary (plain JavaScript object), and have three keys:
-      //
-      // `manager`: The database-specific "connection manager" that we just built above.
-      //
-      // `config  : Configuration options for the datastore.  Should be passed straight through
-      //            from what was provided as the `datastoreConfig` argument to this method.
-      //
-      // `driver` : Optional.  A reference to a stateless, underlying Node-Machine driver.
-      //            (For instance `machinepack-postgresql` for the `sails-postgresql` adapter.)
-      //            Note that this stateless, standardized driver will be merged into the main
-      //            concept of an adapter in future versions of the Waterline adapter spec.
-      //            (See https://github.com/node-machine/driver-interface for more informaiton.)
-      //
-      registeredDatastores[datastoreName] = {
-        config: datastoreConfig,
-        manager: manager,
-        driver: undefined // << TODO: include driver here (if relevant)
-      };
-
-      // Inform Waterline that the datastore was registered successfully.
-      return done();
-    }, 16);
   },
 
   /**
@@ -230,9 +189,7 @@ module.exports = {
    * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    */
   teardown: function(datastoreName, done) {
-    // Look up the datastore entry (manager/driver/config).
     return done();
-   
   },
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -272,7 +229,7 @@ module.exports = {
   create: async function(datastoreName, query, done) {
     const TableName = query.using;
     const record = query.newRecord;
-    const schema = registeredDatastores[TableName];
+    const schema = registeredDatastores[datastoreName][TableName];
     if (!schema) {
       throw new Error({
         err: `No table registered in models with ${TableName}`
@@ -314,7 +271,7 @@ module.exports = {
   createEach: async function(datastoreName, query, done) {
     const TableName = query.using;
     const records = query.newRecords;
-    const schema = registeredDatastores[TableName];
+    const schema = registeredDatastores[datastoreName][TableName];
     if (!schema) {
       throw new Error({
         err: `No table registered in models with ${TableName}`
@@ -354,29 +311,30 @@ module.exports = {
    *               @param {Array?}
    * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    */
-  update: function(datastoreName, query, done) {
+  update: async function(datastoreName, query, done) {
     // Look up the datastore entry (manager/driver/config).
-    var dsEntry = registeredDatastores[datastoreName];
-
-    // Sanity check:
-    if (_.isUndefined(dsEntry)) {
-      return done(
-        new Error(
-          'Consistency violation: Cannot do that with datastore (`' +
-            datastoreName +
-            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
-        )
-      );
+    const TableName = query.using;
+    const schema = registeredDatastores[datastoreName][TableName];
+    if (!schema) {
+      throw new Error({
+        err: `No table registered in models with ${TableName}`
+      });
     }
-
-    // Perform the query (and if relevant, send back a result.)
-    //
-    // > TODO: Replace this setTimeout with real logic that calls
-    // > `done()` when finished. (Or remove this method from the
-    // > adapter altogether
-    setTimeout(() => {
-      return done(new Error('Adapter method (`update`) not implemented yet.'));
-    }, 16);
+    const record = query.valuesToSet;
+    const Item = util.createDynamoItem(record, schema);
+    // Here an assumption is made that update will always have keys in 0th index of where
+    // This will be true in every case but I am not sure
+    // Can be updated in future
+    let { and } = query.criteria.where;
+    let Key = and.reduce((prev, curr) => ({ ...prev, ...curr }), {});
+    let AttributeUpdates = util.createUpdateObject(Item);
+    const queryObj = {
+      TableName,
+      Key,
+      AttributeUpdates
+    };
+    await client.update(queryObj).promise();
+    done();
   },
 
   /**
@@ -398,29 +356,36 @@ module.exports = {
    *               @param {Array?}
    * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    */
-  destroy: function(datastoreName, query, done) {
+  destroy: async function(datastoreName, query, done) {
     // Look up the datastore entry (manager/driver/config).
-    var dsEntry = registeredDatastores[datastoreName];
+    const dsEntry = registeredDatastores[datastoreName];
 
     // Sanity check:
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          'Consistency violation: Cannot do that with datastore (`' +
-            datastoreName +
-            '`) because no matching datastore entry is registered in this adapter!  This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)'
+          `Consistency violation: Cannot do that with datastore (${datastoreName}) 
+          because no matching datastore entry is registered in this adapter!  
+          This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), 
+          or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"`
         )
       );
     }
-
-    // Perform the query (and if relevant, send back a result.)
-    //
-    // > TODO: Replace this setTimeout with real logic that calls
-    // > `done()` when finished. (Or remove this method from the
-    // > adapter altogether
-    setTimeout(() => {
-      return done(new Error('Adapter method (`destroy`) not implemented yet.'));
-    }, 16);
+    const TableName = query.using;
+    const schema = dsEntry[TableName];
+    if (!schema) {
+      throw new Error({
+        err: `No table registered in models with ${TableName}`
+      });
+    }
+    let { and } = query.criteria.where;
+    let Key = and.reduce((prev, curr) => ({ ...prev, ...curr }), {});
+    const queryObj = {
+      TableName,
+      Key
+    };
+    await client.delete(queryObj).promise();
+    done();
   },
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -450,11 +415,9 @@ module.exports = {
    *               @param {Array}  [matching physical records]
    * - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
    */
-  find: function(datastoreName, query, done) {
+  find: async function(datastoreName, query, done) {
     // Look up the datastore entry (manager/driver/config).
-    var dsEntry = registeredDatastores[datastoreName];
-
-    // Sanity check:
+    const dsEntry = registeredDatastores[datastoreName];
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
@@ -464,15 +427,67 @@ module.exports = {
         )
       );
     }
+    const TableName = query.using;
+    const schema = dsEntry[TableName];
+    console.log(JSON.stringify(query));
+    const {where,limit,sort} = query.criteria;
+    let { and } = where;
+    if(!and && Object.keys(where).length === 1)
+    {
+      // when user entered single value to search
+      and = [where];
+    }
+    const normalizedQuery = and.reduce((prev, curr) => ({ ...prev, ...curr }), {});
+    const indexes = util.getIndexes(schema, normalizedQuery);
+    console.log("INDEXES")
+    console.log(indexes);
+    const conditions = util.prepareConditions(normalizedQuery, indexes);
 
-    // Perform the query and send back a result.
-    //
-    // > TODO: Replace this setTimeout with real logic that calls
-    // > `done()` when finished. (Or remove this method from the
-    // > adapter altogether
-    setTimeout(() => {
-      return done(new Error('Adapter method (`find`) not implemented yet.'));
-    }, 16);
+    const dynamoQuery = {
+      TableName,
+      AttributesToGet:query.select,
+      ...conditions
+    };
+    console.log(dynamoQuery)
+    let data;
+    if(indexes.type === 'query'){
+      console.log('Normal Query');
+      data = await client.query(dynamoQuery).promise();
+    }else if(indexes.type === 'localIndex'){
+      console.log('Local Index Query');
+      let IndexName = `${indexes.keys.hash}_local_index`;
+      dynamoQuery.IndexName = IndexName; 
+      data = await client.query(dynamoQuery).promise();
+    }else if(indexes.type === 'globalIndex'){
+      console.log('global index query');
+      let {hash} = indexes.keys;
+      let range = query[hash].rangeKey;
+      if(!range){
+        dynamoQuery.IndexName = `${hash}_global_index`;
+      }
+      else{ 
+        dynamoQuery.IndexName = `${hash}_${range}_global_index`;
+      }
+      data = await client.query(dynamoQuery).promise();
+    }else if(indexes.type === 'scan'){
+      console.log('scan');
+      data = await client.scan(dynamoQuery).promise();
+    }
+    console.log(data);
+    const normalizedData = data.Items.map(entry=>util.normalizeData(entry,schema));
+    return done(null, normalizedData);
+    // `${hashAttribute}_${columnName}_local_index`
+    // `${columnName}_${rangeKey}_global_index`
+
+ //name: { in: ['foo', 'bar'] }
+    // check for hash key
+    //  check for range key
+    //  check for GlobalSecondary
+    // if hasHash && hasRange => query
+    // if hasHash && hasSecondary => queryIndexes
+    // if GlobalSecondary
+    //    rangeKey is present
+    // 
   },
 
   /**

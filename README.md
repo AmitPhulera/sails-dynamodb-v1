@@ -49,6 +49,10 @@ But on little bit digging I found description key which was of not that much use
 | Global Secondary Index\* | description = 'global-secondary' |
 
 **Global secondary indexes can have a hash key and range key of their own so the attribute on which you will add description as 'global-secondary' will be considered as hash key and you can specify it's range key in description only after ##**
+
+Default index names will be
+`${hashAttribute}_${columnName}_local_index`
+
 For example
 
 ```
