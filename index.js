@@ -39,7 +39,7 @@ var registeredDatastores = {};
  */
 module.exports = {
   // The identity of this adapter, to be referenced by datastore configurations in a Sails app.
-  identity: 'dynamodb-v1',
+  identity: 'sails-dynamodb-v1',
 
   // Waterline Adapter API Version
   //

@@ -1,10 +1,6 @@
 # sails-dynamodb-v1
 
-Provides easy access to `dynamodb-v1` from Sails.js & Waterline.
-
-This module is a Sails/Waterline community adapter. Its goal is to provide a set of declarative interfaces, conventions, and best-practices for integrating with the dynamodb-v1 database/service.
-
-Strict adherence to an adapter specification enables the (re)use of built-in generic test suites, standardized documentation, reasonable expectations around the API for your users, and overall, a more pleasant development experience for everyone.
+A waterline based adapter for accessing dynamoDB with SailsJS Version 1+.
 
 ## Installation
 
