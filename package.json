@@ -25,11 +25,10 @@
   "author": "amit",
   "license": "MIT",
   "dependencies": {
-    "@sailshq/lodash": "^3.10.2",
     "aws-sdk": "^2.517.0"
   },
   "devDependencies": {
-    "eslint": "3.19.0",
+    "eslint": ">=4.18.2",
     "waterline-adapter-tests": "^1.0.0-6"
   },
   "waterlineAdapter": {
