@@ -1,12 +1,8 @@
 const _ = require('@sailshq/lodash');
 const AWS = require('aws-sdk');
 const util = require('./utils/app.util');
-const dynamoDb = new AWS.DynamoDB({
-  region: 'us-west-1'
-});
-const client = new AWS.DynamoDB.DocumentClient({
-  region: 'us-west-1'
-});
+
+let dynamoDb,client;
 /**
  * Module state
  */
@@ -63,6 +59,17 @@ module.exports = {
   // Default datastore configuration.
   defaults: {},
 
+  updateCredentials:function(datastoreConfig){
+    const { accessKeyId, secretAccessKey, region } = datastoreConfig;
+    const credObj = {
+      accessKeyId,
+      secretAccessKey,
+      region
+    };
+    dynamoDb = new AWS.DynamoDB({ apiVersion: '2012-08-10', region });
+    dynamoDb.config.update(credObj);
+    client = new AWS.DynamoDB.DocumentClient({service:dynamoDb});
+  },
   //  ╔═╗═╗ ╦╔═╗╔═╗╔═╗╔═╗  ┌─┐┬─┐┬┬  ┬┌─┐┌┬┐┌─┐
   //  ║╣ ╔╩╦╝╠═╝║ ║╚═╗║╣   ├─┘├┬┘│└┐┌┘├─┤ │ ├┤
   //  ╚═╝╩ ╚═╩  ╚═╝╚═╝╚═╝  ┴  ┴└─┴ └┘ ┴ ┴ ┴ └─┘
@@ -131,13 +138,18 @@ module.exports = {
         )
       );
     }
-    if (!datastoreConfig.accessKeyId || !datastoreConfig.secretAccessKey) {
+    if (
+      !datastoreConfig.accessKeyId ||
+      !datastoreConfig.secretAccessKey ||
+      !datastoreConfig.region
+    ) {
       return done(
         new Error(
           'Improper configuration of Dynamo Adaptor.\naccessKeyId or secretAccessKey missing\n.Please verfiy your settings in config/datastores.js   '
         )
       );
     }
+    this.updateCredentials(datastoreConfig);
     try {
       registeredDatastores[datastoreName] = {};
       const tableList = await dynamoDb.listTables().promise();
