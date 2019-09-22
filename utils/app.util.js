@@ -16,9 +16,6 @@ const DYNAMO_TYPES = {
   boolean: 'BOOL',
   binary: 'B'
 };
-//EQ | NE | IN | LE | LT | GE | GT | BETWEEN | NOT_NULL | NULL | CONTAINS | NOT_CONTAINS | BEGINS_WITH,
-
-//'<''<=''>''>=''!=',nin,in,contains,startsWith,endsWith
 
 const OPERATOR_MAP = {
   '=': 'EQ',
@@ -44,24 +41,19 @@ module.exports = {
    */
   diff: (A, B) => {
     if (!Array.isArray(A) || !Array.isArray(B)) {
-      throw Error({ err: 'Array or Set expected as input in diff' });
+      throw Error({ err: 'Array expected' });
     }
     const s = new Set(B);
     let res = A.filter(x => !s.has(x));
     return res;
   },
-  // LocalSecondary Index ka array banega
-  // [{
-  //    IndexName: hashkey+this.columnName
-  //
-  // }]
   /**
    * @function utils.getDynamoConfig
    * @param {Object} sailsSchema schema object for all the datastores configured
    * @param {string} table name of the table
-   * @return {Object}
    * @description Extracts the properties from sails schema that are required to create dynamo table like tablename,
    * hashKey,rangeKey,secondaryKey
+   * @return {Object}
    */
   getDynamoConfig: (sailsSchema, table) => {
     const schema = sailsSchema[table];
@@ -123,98 +115,11 @@ module.exports = {
       throw Error({ err: `Table ${tableName} must have atleast hash key` });
     }
     const AttributeDefinitions = attributes
-      .map(attr => {
-        let { KeyType, type, columnName, rangeKey } = attr;
-        const dynaomoAttr = {
-          AttributeName: columnName,
-          AttributeType: type
-        };
-        if (rangeKey) {
-          lSRangeKeys.push(rangeKey);
-        }
-        switch (KeyType) {
-          case 'HASH': {
-            KeySchema.push({
-              AttributeName: columnName,
-              KeyType: 'HASH'
-            });
-            return dynaomoAttr;
-          }
-          case 'RANGE': {
-            KeySchema.push({
-              AttributeName: columnName,
-              KeyType: 'RANGE'
-            });
-            return dynaomoAttr;
-          }
-          case 'LocalSecondary': {
-            LocalSecondaryIndexes.push({
-              IndexName: `${columnName}_local_index`,
-              KeySchema: [
-                {
-                  AttributeName: hashAttribute,
-                  KeyType: 'HASH'
-                },
-                {
-                  AttributeName: columnName,
-                  KeyType: 'RANGE'
-                }
-              ],
-              Projection: {
-                ProjectionType: 'ALL'
-              }
-            });
-            return dynaomoAttr;
-          }
-          case 'GlobalSecondary': {
-            if (rangeKey) {
-              GlobalSecondaryIndexes.push({
-                IndexName: `${columnName}_${rangeKey}_global_index`,
-                KeySchema: [
-                  {
-                    AttributeName: columnName,
-                    KeyType: 'HASH'
-                  },
-                  {
-                    AttributeName: rangeKey,
-                    KeyType: 'RANGE'
-                  }
-                ],
-                Projection: {
-                  ProjectionType: 'ALL'
-                },
-                ProvisionedThroughput: {
-                  ReadCapacityUnits: 1,
-                  WriteCapacityUnits: 1
-                }
-              });
-            } else {
-              GlobalSecondaryIndexes.push({
-                IndexName: `${columnName}_global_index`,
-                KeySchema: [
-                  {
-                    AttributeName: columnName,
-                    KeyType: 'HASH'
-                  }
-                ],
-                Projection: {
-                  ProjectionType: 'ALL'
-                },
-                ProvisionedThroughput: {
-                  ReadCapacityUnits: 1 /* required */,
-                  WriteCapacityUnits: 1 /* required */
-                }
-              });
-            }
-            return dynaomoAttr;
-          }
-          default: {
-            return undefined;
-          }
-        }
-      })
+      .map(createDynamoDefinitions)
       .filter(Boolean);
     if (lSRangeKeys.length >= 1) {
+      // Due to the format in which we are specifying global secondary index, we have to check afterwards if the range
+      // key provided in index definition is already in AttributeDefinition array, if not add it to the array.
       attributes.map(attr => {
         if (lSRangeKeys.indexOf(attr.columnName) !== -1) {
           let { type, columnName } = attr;
@@ -241,6 +146,98 @@ module.exports = {
       schemaObj.GlobalSecondaryIndexes = GlobalSecondaryIndexes;
     }
     return schemaObj;
+
+    /** helper functions */
+    function createDynamoDefinitions(attr) {
+      let { KeyType, type, columnName, rangeKey } = attr;
+      const dynaomoAttr = {
+        AttributeName: columnName,
+        AttributeType: type
+      };
+      if (rangeKey) {
+        lSRangeKeys.push(rangeKey);
+      }
+      switch (KeyType) {
+        case 'HASH': {
+          KeySchema.push({
+            AttributeName: columnName,
+            KeyType: 'HASH'
+          });
+          return dynaomoAttr;
+        }
+        case 'RANGE': {
+          KeySchema.push({
+            AttributeName: columnName,
+            KeyType: 'RANGE'
+          });
+          return dynaomoAttr;
+        }
+        case 'LocalSecondary': {
+          LocalSecondaryIndexes.push({
+            IndexName: `${columnName}_local_index`,
+            KeySchema: [
+              {
+                AttributeName: hashAttribute,
+                KeyType: 'HASH'
+              },
+              {
+                AttributeName: columnName,
+                KeyType: 'RANGE'
+              }
+            ],
+            Projection: {
+              ProjectionType: 'ALL'
+            }
+          });
+          return dynaomoAttr;
+        }
+        case 'GlobalSecondary': {
+          if (rangeKey) {
+            GlobalSecondaryIndexes.push({
+              IndexName: `${columnName}_${rangeKey}_global_index`,
+              KeySchema: [
+                {
+                  AttributeName: columnName,
+                  KeyType: 'HASH'
+                },
+                {
+                  AttributeName: rangeKey,
+                  KeyType: 'RANGE'
+                }
+              ],
+              Projection: {
+                ProjectionType: 'ALL'
+              },
+              ProvisionedThroughput: {
+                ReadCapacityUnits: 1,
+                WriteCapacityUnits: 1
+              }
+            });
+          } else {
+            GlobalSecondaryIndexes.push({
+              IndexName: `${columnName}_global_index`,
+              KeySchema: [
+                {
+                  AttributeName: columnName,
+                  KeyType: 'HASH'
+                }
+              ],
+              Projection: {
+                ProjectionType: 'ALL'
+              },
+              ProvisionedThroughput: {
+                ReadCapacityUnits: 1 /* required */,
+                WriteCapacityUnits: 1 /* required */
+              }
+            });
+          }
+          return dynaomoAttr;
+        }
+        default: {
+          return undefined;
+        }
+      }
+    }
   },
   /**
    * @function utils.populateDataStore
@@ -295,16 +292,13 @@ module.exports = {
         batchedItems.push(batchArr);
         batchArr = [];
       }
-      batchArr.push(this.batchObj(Item));
+      batchArr.push({
+        PutRequest: {
+          Item
+        }
+      });
     }
     return batchedItems;
-  },
-  batchObj: Item => {
-    return {
-      PutRequest: {
-        Item
-      }
-    };
   },
   /**
    * @param obj
@@ -327,6 +321,13 @@ module.exports = {
     });
     return AttributeUpdates;
   },
+  /**
+   * 
+   * @param {Object} schema 
+   * @param {Object} query
+   * @description Figures out type of query to perform with given qeury object
+   * and shcema information
+   */
   getIndexes: function(schema, query) {
     let queryNature = {};
     let { indexInfo, filterKeys } = this.extractIndexFields(query, schema);
@@ -366,7 +367,15 @@ module.exports = {
     queryNature.filterKeys = filterKeys;
     return queryNature;
   },
-  extractIndexFields: (query, schema) => {
+  /**
+   * 
+   * @param {object} query 
+   * @param {object} schema
+   * @description returns a map which contains the index type
+   * to set as attribute names if present in query else are set 
+   * as false.  
+   */
+  extractIndexFields: function(query, schema) {
     let indexInfo = {
       hash: false,
       range: false,
@@ -390,7 +399,15 @@ module.exports = {
     });
     return { indexInfo, filterKeys };
   },
-  prepareConditions(query, indexInfo) {
+  /**
+   * @function prepareConditions
+   * @param {Object} query A JSON query object
+   * @param {Object} indexInfo index info
+   * @description given the JSON query function will return
+   * Dynamo Query object with key indexes and will add rest
+   * keys in filter object.
+   */
+  prepareQueryConditions(query, indexInfo) {
     // https://sailsjs.com/documentation/concepts/models-and-orm/query-language
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#query-property
     // How to get index name?
@@ -411,7 +428,12 @@ module.exports = {
     }, {});
     return { QueryFilter, KeyConditions };
   },
-  dynamoAttribute(attr) {
+  /**
+   * @function dynamoAttribute
+   * @param {Object|String} attr
+   * @description Converts a attribute of sails query to it's respective dynamoDB query Attribute
+   */
+  dynamoAttribute: function(attr) {
     let ComparisonOperator = 'EQ';
     let value = attr;
     if (typeof attr === 'object' && attr !== null) {
@@ -426,7 +448,14 @@ module.exports = {
     const AttributeValueList = Array.isArray(value) ? value : [value];
     return { AttributeValueList, ComparisonOperator };
   },
-  normalizeData(entry, schema) {
+  /**
+   * @function normarlizeData
+   * @param {Objec} entry A dynamoDb record.
+   * @param {Object} schema datastore object of the table
+   * @description Used for normalizing each entry queried from dynamoDB as in cases of sets the application expects
+   * array, So this function translates DynamoSets to js arrays.
+   */
+  normalizeData: function(entry, schema) {
     Object.keys(entry).forEach(attr => {
       if (schema[attr].type === 'SS' || schema[attr].type === 'NS') {
         entry[attr] = entry[attr].values;
@@ -435,11 +464,3 @@ module.exports = {
     return entry;
   }
 };
-/**
- {
-   <AttributeName>:{
-     ComparisionOperator:<>,
-
-   }
- }
- */

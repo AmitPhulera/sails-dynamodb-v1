@@ -61,8 +61,7 @@ module.exports = {
   adapterApiVersion: 1,
 
   // Default datastore configuration.
-  defaults: {
-  },
+  defaults: {},
 
   //  ╔═╗═╗ ╦╔═╗╔═╗╔═╗╔═╗  ┌─┐┬─┐┬┬  ┬┌─┐┌┬┐┌─┐
   //  ║╣ ╔╩╦╝╠═╝║ ║╚═╗║╣   ├─┘├┬┘│└┐┌┘├─┤ │ ├┤
@@ -140,11 +139,6 @@ module.exports = {
       );
     }
     try {
-      // get tables
-      // from existing tables create dynamo Schema
-      // save schema to datastores
-      // get tables that have not been created
-      // create the tables
       registeredDatastores[datastoreName] = {};
       const tableList = await dynamoDb.listTables().promise();
       const existingTables = new Set(tableList.TableNames);
@@ -155,7 +149,9 @@ module.exports = {
       });
       const $tableCreate = configuredTables
         .map(tableName => util.getDynamoConfig(physicalModelsReport, tableName))
-        .map(schema => util.populateDataStore(registeredDatastores[datastoreName], schema))
+        .map(schema =>
+          util.populateDataStore(registeredDatastores[datastoreName], schema)
+        )
         .filter(schema => !existingTables.has(schema.tableName))
         .map(util.prepareCreateTableQuery)
         .map(queryObj => dynamoDb.createTable(queryObj).promise());
@@ -328,7 +324,11 @@ module.exports = {
       Key,
       AttributeUpdates
     };
-    await client.update(queryObj).promise();
+    try {
+      await client.update(queryObj).promise();
+    } catch (err) {
+      return done(Error(err));
+    }
     done();
   },
 
@@ -379,7 +379,11 @@ module.exports = {
       TableName,
       Key
     };
-    await client.delete(queryObj).promise();
+    try {
+      await client.delete(queryObj).promise();
+    } catch (err) {
+      return done(Error(err));
+    }
     done();
   },
 
@@ -424,52 +428,72 @@ module.exports = {
     }
     const TableName = query.using;
     const schema = dsEntry[TableName];
-    console.log(JSON.stringify(query));
-    const {where,limit,sort} = query.criteria;
+    const { where, limit, sort } = query.criteria;
+    if (sort && sort.length > 1) {
+      throw Error({ err: 'Cannot sort on more than one field' });
+    }
+    let ScanIndexForward = true;
+    let k = Object.keys(sort[0])[0];
+    let sortType = sort[0][k];
+    if (sortType === 'DESC') {
+      ScanIndexForward = false;
+    }
+
     let { and } = where;
-    if(!and && Object.keys(where).length === 1)
-    {
+    if (!and && Object.keys(where).length === 1) {
       // when user entered single value to search
       and = [where];
     }
-    const normalizedQuery = and.reduce((prev, curr) => ({ ...prev, ...curr }), {});
+    const normalizedQuery = and.reduce(
+      (prev, curr) => ({ ...prev, ...curr }),
+      {}
+    );
     const indexes = util.getIndexes(schema, normalizedQuery);
-    console.log("INDEXES")
-    console.log(indexes);
-    const conditions = util.prepareConditions(normalizedQuery, indexes);
-
+    const conditions = util.prepareQueryConditions(normalizedQuery, indexes);
+    let LastEvaluatedKey = true;
     const dynamoQuery = {
       TableName,
-      AttributesToGet:query.select,
+      ScanIndexForward,
+      Limit: limit,
+      AttributesToGet: query.select,
       ...conditions
     };
-    console.log(dynamoQuery)
     let data;
-    if(indexes.type === 'query'){
-      console.log('Normal Query');
-      data = await client.query(dynamoQuery).promise();
-    }else if(indexes.type === 'localIndex'){
+    if (indexes.type === 'localIndex') {
       console.log('Local Index Query');
       let IndexName = `${indexes.keys.hash}_local_index`;
-      dynamoQuery.IndexName = IndexName; 
-      data = await client.query(dynamoQuery).promise();
-    }else if(indexes.type === 'globalIndex'){
+      dynamoQuery.IndexName = IndexName;
+    } else if (indexes.type === 'globalIndex') {
       console.log('global index query');
-      let {hash} = indexes.keys;
+      let { hash } = indexes.keys;
       let range = schema[hash].rangeKey;
-      if(!range){
+      if (!range) {
         dynamoQuery.IndexName = `${hash}_global_index`;
-      }
-      else{ 
+      } else {
         dynamoQuery.IndexName = `${hash}_${range}_global_index`;
       }
-      data = await client.query(dynamoQuery).promise();
-    }else if(indexes.type === 'scan'){
-      console.log('scan');
-      data = await client.scan(dynamoQuery).promise();
     }
-    console.log(data);
-    const normalizedData = data.Items.map(entry=>util.normalizeData(entry,schema));
+    let finalData = [];
+    while (true) {
+      try {
+        if (indexes.type === 'scan') {
+          data = await client.scan(dynamoQuery).promise();
+        }
+        data = await client.query(dynamoQuery).promise();
+      } catch (err) {
+        return done(Error(err));
+      }
+      finalData = [...finalData, ...data.Items];
+      ({ LastEvaluatedKey } = data);
+      if (!LastEvaluatedKey) {
+        break;
+      } else {
+        dynamoQuery.ExclusiveStartKey = LastEvaluatedKey;
+      }
+    }
+    const normalizedData = finalData.map(entry =>
+      util.normalizeData(entry, schema)
+    );
     return done(null, normalizedData);
   },
 

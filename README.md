@@ -46,7 +46,7 @@ But on little bit digging I found description key which was of not that much use
 | Hash Key                 | description = 'hash'             |
 | Range Key                | description = 'range'            |
 | Secondary Index          | description = 'local-secondary'        |
-| Global Secondary Index\* | description = 'global-secondary' |
+| Global Secondary Index | description = 'global-secondary' |
 
 **Global secondary indexes can have a hash key and range key of their own so the attribute on which you will add description as 'global-secondary' will be considered as hash key and you can specify it's range key in description only after ##**
 
@@ -82,6 +82,12 @@ module.exports = {
 - Keys that are not specified i.e either are '' or undefined will be filtered out while creating. 
 
 Then [connect the adapter](https://sailsjs.com/documentation/reference/configuration/sails-config-datastores) to one or more of your app's datastores.
+
+## AWS DynamoDB Credentials are required to access the table 
+adapter: 'dynamodb-v1',
+    accessKeyId: 'AKIAIGNICTAFZP5ZXW6Q',
+    secretAccessKey: 'eMvwMaxi6cSUGKYRu/NZsQWVIznfNjvoKZ2YX6LK',
+    region: 'us-west-1',
 
 ## Usage
 
