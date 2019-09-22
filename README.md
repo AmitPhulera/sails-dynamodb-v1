@@ -83,12 +83,15 @@ module.exports = {
 
 Then [connect the adapter](https://sailsjs.com/documentation/reference/configuration/sails-config-datastores) to one or more of your app's datastores.
 
-## AWS DynamoDB Credentials are required to access the table 
-adapter: 'dynamodb-v1',
-    accessKeyId: 'AKIAIGNICTAFZP5ZXW6Q',
-    secretAccessKey: 'eMvwMaxi6cSUGKYRu/NZsQWVIznfNjvoKZ2YX6LK',
-    region: 'us-west-1',
-
+- AWS DynamoDB Credentials are required to access the table, so in config/datastores.js configure following keys
+```
+{
+    adapter: 'dynamodb-v1',
+    accessKeyId: 'ACCESS_KEY',
+    secretAccessKey: 'SECRET_KEY',
+    region: 'REGION',
+}
+```
 ## Usage
 
 Visit [Models & ORM](https://sailsjs.com/docs/concepts/models-and-orm) in the docs for more information about using models, datastores, and adapters in your app/microservice.
@@ -108,10 +111,10 @@ This adapter implements the following methods:
 | registerDatastore | __done__ | LIFECYCLE |
 | teardown          | __done__ | LIFECYCLE |
 | create            | __in progress__           | DML       |
-| createEach        | Planned           | DML       |
-| update            | Planned           | DML       |
-| destroy           | Planned           | DML       |
-| find              | Planned           | DQL       |
+| createEach        | __done__           | DML       |
+| update            | __done__           | DML       |
+| destroy           | __done__           | DML       |
+| find              | __done__           | DQL       |
 | join              | _**???**_         | DQL       |
 | count             | Planned           | DQL       |
 | sum               | __NO USE__           | DQL       |
