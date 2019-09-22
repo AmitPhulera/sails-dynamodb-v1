@@ -1,7 +1,3 @@
-/**
- * Module dependencies
- */
-
 const _ = require('@sailshq/lodash');
 const AWS = require('aws-sdk');
 const util = require('./utils/app.util');
@@ -66,7 +62,6 @@ module.exports = {
 
   // Default datastore configuration.
   defaults: {
-    // foo: 'bar',
   },
 
   //  ╔═╗═╗ ╦╔═╗╔═╗╔═╗╔═╗  ┌─┐┬─┐┬┬  ┬┌─┐┌┬┐┌─┐
@@ -461,7 +456,7 @@ module.exports = {
     }else if(indexes.type === 'globalIndex'){
       console.log('global index query');
       let {hash} = indexes.keys;
-      let range = query[hash].rangeKey;
+      let range = schema[hash].rangeKey;
       if(!range){
         dynamoQuery.IndexName = `${hash}_global_index`;
       }
@@ -476,18 +471,6 @@ module.exports = {
     console.log(data);
     const normalizedData = data.Items.map(entry=>util.normalizeData(entry,schema));
     return done(null, normalizedData);
-    // `${hashAttribute}_${columnName}_local_index`
-    // `${columnName}_${rangeKey}_global_index`
-
- //name: { in: ['foo', 'bar'] }
-    // check for hash key
-    //  check for range key
-    //  check for GlobalSecondary
-    // if hasHash && hasRange => query
-    // if hasHash && hasSecondary => queryIndexes
-    // if GlobalSecondary
-    //    rangeKey is present
-    // 
   },
 
   /**

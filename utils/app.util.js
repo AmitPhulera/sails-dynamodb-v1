@@ -23,15 +23,15 @@ const DYNAMO_TYPES = {
 const OPERATOR_MAP = {
   '=': 'EQ',
   '!=': 'NE',
-  'in': 'IN',
+  in: 'IN',
   '<=': 'LE',
   '<': 'LT',
   '>=': 'GE',
   '>': 'GT',
-  'between':'BETWEEN',
-  'contains': 'CONTAINS',
-  'nin': 'NOT_CONTAINS',
-  'startsWith': 'BEGINS_WITH'
+  between: 'BETWEEN',
+  contains: 'CONTAINS',
+  nin: 'NOT_CONTAINS',
+  startsWith: 'BEGINS_WITH'
 };
 //special case for not null and null
 
@@ -328,42 +328,42 @@ module.exports = {
     return AttributeUpdates;
   },
   getIndexes: function(schema, query) {
-    
-    
-    let queryNature={};
-    const {indexInfo,filterKeys} = this.extractIndexFields(query,schema);
-    
-    if(indexInfo.hash && indexInfo.range){
+    let queryNature = {};
+    let { indexInfo, filterKeys } = this.extractIndexFields(query, schema);
+
+    if (indexInfo.hash && indexInfo.range) {
       queryNature.type = 'query';
-      queryNature.keys={
-        hash:indexInfo.hash,
-        range:indexInfo.range
+      queryNature.keys = {
+        hash: indexInfo.hash,
+        range: indexInfo.range
       };
-    }else if(indexInfo.hash && indexInfo.localS){
+    } else if (indexInfo.hash && indexInfo.localS) {
       queryNature.type = 'localIndex';
-      queryNature.keys={
-        hash:indexInfo.hash,
-        secondary:indexInfo.localS
+      queryNature.keys = {
+        hash: indexInfo.hash,
+        secondary: indexInfo.localS
       };
-    }else if(indexInfo.globalS){
+    } else if (indexInfo.globalS) {
       queryNature.type = 'globalIndex';
-      queryNature.keys={
-        hash:indexInfo.globalS
+      queryNature.keys = {
+        hash: indexInfo.globalS
       };
-      let {rangeKey} = schema[indexInfo.globalS]; 
-      if(rangeKey && query[rangeKey]){
+      let { rangeKey } = schema[indexInfo.globalS];
+      if (rangeKey && query[rangeKey]) {
         queryNature.keys.range = rangeKey;
       }
-    }else if(indexInfo.hash){
+    } else if (indexInfo.hash) {
       queryNature.type = 'query';
-      queryNature.keys={
-        hash:indexInfo.hash
+      queryNature.keys = {
+        hash: indexInfo.hash
       };
-    }else {
+    } else {
       queryNature.type = 'scan';
     }
-    console.log(schema);
-    queryNature.filterKeys = filterKeys; 
+    if (queryNature.type === 'globalIndex' && queryNature.keys.range) {
+      filterKeys = filterKeys.filter(e => e !== queryNature.keys.range);
+    }
+    queryNature.filterKeys = filterKeys;
     return queryNature;
   },
   extractIndexFields: (query, schema) => {
@@ -388,48 +388,48 @@ module.exports = {
         filterKeys.push(key);
       }
     });
-    return {indexInfo,filterKeys};
+    return { indexInfo, filterKeys };
   },
-  prepareConditions(query, indexInfo){
+  prepareConditions(query, indexInfo) {
     // https://sailsjs.com/documentation/concepts/models-and-orm/query-language
     // https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#query-property
     // How to get index name?
-    let KeyConditions={};
-    if(Object.keys(indexInfo.keys).length !== 0){
-      let {hash,range} = indexInfo.keys;
+    let KeyConditions = {};
+    if (Object.keys(indexInfo.keys).length !== 0) {
+      let { hash, range } = indexInfo.keys;
       let attributeValue = query[hash];
-      KeyConditions[hash]=this.dynamoAttribute(attributeValue);
-      if (range){
-        KeyConditions[range]=this.dynamoAttribute(attributeValue);
-      }  
+      KeyConditions[hash] = this.dynamoAttribute(attributeValue);
+      if (range) {
+        attributeValue = query[range];
+        KeyConditions[range] = this.dynamoAttribute(attributeValue);
+      }
     }
-    let QueryFilter = indexInfo.filterKeys.reduce((qfilter,attr) => {
+    let QueryFilter = indexInfo.filterKeys.reduce((qfilter, attr) => {
       let attributeValue = query[attr];
       qfilter[attr] = this.dynamoAttribute(attributeValue);
       return qfilter;
-    },{});
-    return {QueryFilter,KeyConditions};
+    }, {});
+    return { QueryFilter, KeyConditions };
   },
-  dynamoAttribute(attr){
+  dynamoAttribute(attr) {
     let ComparisonOperator = 'EQ';
     let value = attr;
-    if(typeof attr === 'object' && attr !== null)
-    {
+    if (typeof attr === 'object' && attr !== null) {
       //support for multiple operators
       let operator = Object.keys(attr)[0];
       value = attr[operator];
-      if( typeof OPERATOR_MAP[operator] === 'undefined'){
+      if (typeof OPERATOR_MAP[operator] === 'undefined') {
         throw Error(`Operator ${operator} not supported by the adapter`);
       }
       ComparisonOperator = OPERATOR_MAP[operator];
     }
     const AttributeValueList = Array.isArray(value) ? value : [value];
-    return {AttributeValueList,ComparisonOperator};
+    return { AttributeValueList, ComparisonOperator };
   },
-  normalizeData(entry, schema){
-    Object.keys(entry).forEach(attr=>{
-      if(schema[attr].type === 'SS' || schema[attr].type === 'NS'){
-        entry[attr]=entry[attr].values;
+  normalizeData(entry, schema) {
+    Object.keys(entry).forEach(attr => {
+      if (schema[attr].type === 'SS' || schema[attr].type === 'NS') {
+        entry[attr] = entry[attr].values;
       }
     });
     return entry;
