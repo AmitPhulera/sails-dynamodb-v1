@@ -11,7 +11,7 @@ $ npm install sails-dynamodb-v1
 ```
 
 AWS DynamoDB Credentials are required to access the table, so in config/datastores.js configure following keys
-- adapter = 'dynamodb-v1'
+- adapter = 'sails-dynamodb-v1'
 - accessKeyId = 'your_access_key'
 - secretAccessKey = 'your_secret_key'
 - region = 'region of table'
@@ -22,7 +22,7 @@ If using default datasore your config/datastores.js should look like.
 
 module.exports.datastores = {
   default: {
-    adapter: 'dynamodb-v1',
+    adapter: 'sails-dynamodb-v1',
     accessKeyId: ACCESS_KEY,
     secretAccessKey: SECRET_KEY,
     region: REGION,
