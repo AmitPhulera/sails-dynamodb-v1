@@ -2,7 +2,7 @@ const _ = require('@sailshq/lodash');
 const AWS = require('aws-sdk');
 const util = require('./utils/app.util');
 
-let dynamoDb,client;
+let dynamoDb, client;
 /**
  * Module state
  */
@@ -59,16 +59,18 @@ module.exports = {
   // Default datastore configuration.
   defaults: {},
 
-  updateCredentials:function(datastoreConfig){
-    const { accessKeyId, secretAccessKey, region } = datastoreConfig;
+  updateCredentials: function(datastoreConfig) {
+    const { accessKeyId, secretAccessKey, region, url } = datastoreConfig;
     const credObj = {
       accessKeyId,
       secretAccessKey,
       region
     };
-    dynamoDb = new AWS.DynamoDB({ apiVersion: '2012-08-10', region });
-    dynamoDb.config.update(credObj);
-    client = new AWS.DynamoDB.DocumentClient({service:dynamoDb});
+    if (url) {
+      credObj.endpoint = url;
+    }
+    dynamoDb = new AWS.DynamoDB(credObj);
+    client = new AWS.DynamoDB.DocumentClient({ service: dynamoDb });
   },
   //  ╔═╗═╗ ╦╔═╗╔═╗╔═╗╔═╗  ┌─┐┬─┐┬┬  ┬┌─┐┌┬┐┌─┐
   //  ║╣ ╔╩╦╝╠═╝║ ║╚═╗║╣   ├─┘├┬┘│└┐┌┘├─┤ │ ├┤
