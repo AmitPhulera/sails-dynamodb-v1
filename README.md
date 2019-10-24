@@ -15,6 +15,7 @@ AWS DynamoDB Credentials are required to access the table, so in config/datastor
 - accessKeyId = 'your_access_key'
 - secretAccessKey = 'your_secret_key'
 - region = 'region of table'
+- url = 'endpoint of your dynamodb'
 
 If using default datasore your config/datastores.js should look like.
 
@@ -28,10 +29,20 @@ module.exports.datastores = {
     region: REGION,
 }
 };
-
-
 ```
+If you are using local dynamodb then url parameter must be passed which is translated to enpoint parameter in dynamodb SDK. accessKeyId, secretAccessKey and region can be any random strings but should not be left blank else adpater will throw an error.
 
+```js
+module.exports.datastores = {
+  default: {
+    adapter: 'sails-dynamodb-v1',
+    accessKeyId: "somestring",
+    secretAccessKey: "someanotherstring",
+    region: "local",
+    url:"http://localhost:8000"
+}
+};
+```
 ## Configuring Models
 
 SailsJS creates an archive models by default, it is recommended that you disable it by setting 'archiveModelIdentity' property to false in config/models.js otherwise a table named as archive will be created

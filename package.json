@@ -1,6 +1,6 @@
 {
   "name": "sails-dynamodb-v1",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A dynamodb adapter for Sails / Waterline compatible with SailsJS v1",
   "main": "index.js",
   "scripts": {
