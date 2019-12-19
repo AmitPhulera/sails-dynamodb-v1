@@ -447,10 +447,12 @@ module.exports = {
       throw Error({ err: 'Cannot sort on more than one field' });
     }
     let ScanIndexForward = true;
-    let k = Object.keys(sort[0])[0];
-    let sortType = sort[0][k];
-    if (sortType === 'DESC') {
-      ScanIndexForward = false;
+
+    if (sort.length === 1 ){
+      let sortValue = Object.values(sort[0])[0];
+      if (sortValue === 'DESC') {
+        ScanIndexForward = false;
+      }
     }
 
     let { and } = where;
