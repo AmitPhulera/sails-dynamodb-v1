@@ -117,11 +117,14 @@ module.exports = {
     const AttributeDefinitions = attributes
       .map(createDynamoDefinitions)
       .filter(Boolean);
-    if (lSRangeKeys.length >= 1) {
+    if (lSRangeKeys.length >= 1 ) {
       // Due to the format in which we are specifying global secondary index, we have to check afterwards if the range
       // key provided in index definition is already in AttributeDefinition array, if not add it to the array.
       attributes.map(attr => {
-        if (lSRangeKeys.indexOf(attr.columnName) !== -1) {
+        if (lSRangeKeys.indexOf(attr.columnName) !== -1 && 
+        !AttributeDefinitions.find(({AttributeName}) => 
+        AttributeName === attr.columnName
+        )) {
           let { type, columnName } = attr;
           AttributeDefinitions.push({
             AttributeName: columnName,
@@ -323,7 +326,7 @@ module.exports = {
   },
   /**
    * 
-   * @param {Object} schema 
+   * @param {Object} schema
    * @param {Object} query
    * @description Figures out type of query to perform with given qeury object
    * and shcema information
@@ -360,6 +363,7 @@ module.exports = {
       };
     } else {
       queryNature.type = 'scan';
+      queryNature.keys = {};
     }
     if (queryNature.type === 'globalIndex' && queryNature.keys.range) {
       filterKeys = filterKeys.filter(e => e !== queryNature.keys.range);
@@ -368,12 +372,12 @@ module.exports = {
     return queryNature;
   },
   /**
-   * 
-   * @param {object} query 
+   *
+   * @param {object} query
    * @param {object} schema
    * @description returns a map which contains the index type
-   * to set as attribute names if present in query else are set 
-   * as false.  
+   * to set as attribute names if present in query else are set
+   * as false.
    */
   extractIndexFields: function(query, schema) {
     let indexInfo = {

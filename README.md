@@ -12,10 +12,10 @@ $ npm install sails-dynamodb-v1
 
 AWS DynamoDB Credentials are required to access the table, so in config/datastores.js configure following keys
 - adapter = 'sails-dynamodb-v1'
-- accessKeyId = 'your_access_key'
-- secretAccessKey = 'your_secret_key'
-- region = 'region of table'
-- url = 'endpoint of your dynamodb'
+- accessKeyId = <your_access_key>
+- secretAccessKey = <your_secret_key>
+- region = <region of table>
+- url = <endpoint of your dynamodb>
 
 If using default datasore your config/datastores.js should look like.
 
@@ -162,6 +162,6 @@ See [Extending Sails > Adapters > Custom Adapters](https://sailsjs.com/documenta
 
 ## License
 
-This dynamodb-v1 adapter is available under the **MIT license**.
+This sails-dynamodb-v1 adapter is available under the **MIT license**.
 
 As for [Waterline](http://waterlinejs.org) and the [Sails framework](https://sailsjs.com)? They're free and open-source under the [MIT License](https://sailsjs.com/license).
