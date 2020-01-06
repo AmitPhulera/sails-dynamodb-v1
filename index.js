@@ -2,7 +2,8 @@ const _ = require('@sailshq/lodash');
 const AWS = require('aws-sdk');
 const util = require('./utils/app.util');
 
-let dynamoDb, client;
+let dynamoDb;
+let client;
 /**
  * Module state
  */
@@ -448,7 +449,7 @@ module.exports = {
     }
     let ScanIndexForward = true;
 
-    if (sort.length === 1 ){
+    if (sort.length === 1) {
       let sortValue = Object.values(sort[0])[0];
       if (sortValue === 'DESC') {
         ScanIndexForward = false;
@@ -456,7 +457,10 @@ module.exports = {
     }
 
     let { and } = where;
-    if (!and && Object.keys(where).length === 1) {
+    if (Object.keys(where).length === 0) {
+      // when no search object is provided
+      and = [];
+    } else if (!and && Object.keys(where).length === 1) {
       // when user entered single value to search
       and = [where];
     }
@@ -470,10 +474,12 @@ module.exports = {
     const dynamoQuery = {
       TableName,
       ScanIndexForward,
-      Limit: limit,
       AttributesToGet: query.select,
       ...conditions
     };
+    if ( limit && limit < 9007199254740991){
+      dynamoQuery.Limit = limit;
+    }
     let data;
     if (indexes.type === 'localIndex') {
       console.log('Local Index Query');
@@ -493,9 +499,11 @@ module.exports = {
     while (true) {
       try {
         if (indexes.type === 'scan') {
+
           data = await client.scan(dynamoQuery).promise();
+        } else {
+          data = await client.query(dynamoQuery).promise();
         }
-        data = await client.query(dynamoQuery).promise();
       } catch (err) {
         return done(Error(err));
       }

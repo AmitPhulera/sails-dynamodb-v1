@@ -1,6 +1,6 @@
 {
   "name": "sails-dynamodb-v1",
-  "version": "1.0.1",
+  "version": "1.0.3",
   "description": "A dynamodb adapter for Sails / Waterline compatible with SailsJS v1",
   "main": "index.js",
   "scripts": {
@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/amiphulera/sails-dynamodb-v1.git"
+    "url": "git://github.com/amitphulera/sails-dynamodb-v1.git"
   },
   "keywords": [
     "dynamodb",
