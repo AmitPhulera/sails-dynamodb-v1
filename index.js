@@ -326,20 +326,29 @@ module.exports = {
         err: `No table registered in models with ${TableName}`
       });
     }
-    const record = query.valuesToSet;
-    const Item = util.createDynamoItem(record, schema);
-    // Here an assumption is made that update will always have keys in 0th index of where
-    // This will be true in every case but I am not sure
-    // Can be updated in future
-    let { and } = query.criteria.where;
-    let Key = and.reduce((prev, curr) => ({ ...prev, ...curr }), {});
-    let AttributeUpdates = util.createUpdateObject(Item);
-    const queryObj = {
-      TableName,
-      Key,
-      AttributeUpdates
-    };
     try {
+      const record = query.valuesToSet;
+      const Item = util.createDynamoItem(record, schema);
+      // Here an assumption is made that update will always have keys in 0th index of where
+      // This will be true in every case but I am not sure
+      // Can be updated in future
+      let { where } = query.criteria;
+      let { and } = where;
+      if (Object.keys(where).length === 0) {
+        // when no search object is provided
+        throw new Error('No KeyCondition Provided');
+      } else if (!and && Object.keys(where).length === 1) {
+        // when user entered single value to search
+        and = [where];
+      }
+      let Key = and.reduce((prev, curr) => ({ ...prev, ...curr }), {});
+      let AttributeUpdates = util.createUpdateObject(Item);
+      const queryObj = {
+        TableName,
+        Key,
+        AttributeUpdates
+      };
+
       await client.update(queryObj).promise();
     } catch (err) {
       return done(Error(err));
@@ -477,7 +486,7 @@ module.exports = {
       AttributesToGet: query.select,
       ...conditions
     };
-    if ( limit && limit < 9007199254740991){
+    if (limit && limit < 9007199254740991) {
       dynamoQuery.Limit = limit;
     }
     let data;
@@ -499,7 +508,6 @@ module.exports = {
     while (true) {
       try {
         if (indexes.type === 'scan') {
-
           data = await client.scan(dynamoQuery).promise();
         } else {
           data = await client.query(dynamoQuery).promise();
