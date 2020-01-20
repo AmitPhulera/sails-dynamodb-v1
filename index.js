@@ -480,12 +480,17 @@ module.exports = {
     const indexes = util.getIndexes(schema, normalizedQuery);
     const conditions = util.prepareQueryConditions(normalizedQuery, indexes);
     let LastEvaluatedKey = true;
+
     const dynamoQuery = {
       TableName,
       ScanIndexForward,
-      AttributesToGet: query.select,
       ...conditions
     };
+    if (query.select) {
+      dynamoQuery.AttributesToGet = query.select;
+    } else {
+      dynamoQuery.AttributesToGet = Object.keys(schema);
+    }
     if (limit && limit < 9007199254740991) {
       dynamoQuery.Limit = limit;
     }
@@ -508,6 +513,8 @@ module.exports = {
     while (true) {
       try {
         if (indexes.type === 'scan') {
+          dynamoQuery.ScanFilter = util.deepClone(dynamoQuery.QueryFilter);
+          delete dynamoQuery.QueryFilter;
           data = await client.scan(dynamoQuery).promise();
         } else {
           data = await client.query(dynamoQuery).promise();
