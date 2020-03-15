@@ -121,9 +121,9 @@ module.exports = {
       // Due to the format in which we are specifying global secondary index, we have to check afterwards if the range
       // key provided in index definition is already in AttributeDefinition array, if not add it to the array.
       attributes.map(attr => {
-        if (lSRangeKeys.indexOf(attr.columnName) !== -1 && 
-        !AttributeDefinitions.find(({AttributeName}) => 
-        AttributeName === attr.columnName
+        if (lSRangeKeys.indexOf(attr.columnName) !== -1 &&
+        !AttributeDefinitions.find(({AttributeName}) =>
+          AttributeName === attr.columnName
         )) {
           let { type, columnName } = attr;
           AttributeDefinitions.push({
@@ -325,7 +325,7 @@ module.exports = {
     return AttributeUpdates;
   },
   /**
-   * 
+   *
    * @param {Object} schema
    * @param {Object} query
    * @description Figures out type of query to perform with given qeury object

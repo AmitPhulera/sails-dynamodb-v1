@@ -61,14 +61,19 @@ module.exports = {
   defaults: {},
 
   updateCredentials: function(datastoreConfig) {
-    const { accessKeyId, secretAccessKey, region, url } = datastoreConfig;
-    const credObj = {
-      accessKeyId,
-      secretAccessKey,
+    const { accessKeyId, secretAccessKey, region, useRole, url } = datastoreConfig;
+    let credObj = {
       region
     };
     if (url) {
       credObj.endpoint = url;
+    }
+    if (!useRole) {
+      credObj = {
+        ...credObj,
+        accessKeyId,
+        secretAccessKey,
+      };
     }
     dynamoDb = new AWS.DynamoDB(credObj);
     client = new AWS.DynamoDB.DocumentClient({ service: dynamoDb });
@@ -142,13 +147,20 @@ module.exports = {
       );
     }
     if (
-      !datastoreConfig.accessKeyId ||
-      !datastoreConfig.secretAccessKey ||
-      !datastoreConfig.region
+      !datastoreConfig.useRole &&
+      (!datastoreConfig.accessKeyId ||
+      !datastoreConfig.secretAccessKey)
     ) {
       return done(
         new Error(
           'Improper configuration of Dynamo Adaptor.\naccessKeyId or secretAccessKey missing\n.Please verfiy your settings in config/datastores.js   '
+        )
+      );
+    }
+    if (!datastoreConfig.region) {
+      return done(
+        new Error(
+          'Improper configuration of Dynamo Adaptor.\nRegion not provided.\nPlease verfiy your settings in config/datastores.js   '
         )
       );
     }
@@ -383,9 +395,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          `Consistency violation: Cannot do that with datastore (${datastoreName}) 
-          because no matching datastore entry is registered in this adapter!  
-          This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), 
+          `Consistency violation: Cannot do that with datastore (${datastoreName})
+          because no matching datastore entry is registered in this adapter!
+          This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down),
           or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"`
         )
       );
