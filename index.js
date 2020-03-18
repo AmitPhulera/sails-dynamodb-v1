@@ -395,9 +395,9 @@ module.exports = {
     if (_.isUndefined(dsEntry)) {
       return done(
         new Error(
-          `Consistency violation: Cannot do that with datastore (${datastoreName})
-          because no matching datastore entry is registered in this adapter!
-          This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down),
+          `Consistency violation: Cannot do that with datastore (${datastoreName}) 
+          because no matching datastore entry is registered in this adapter!  
+          This is usually due to a race condition (e.g. a lifecycle callback still running after the ORM has been torn down), 
           or it could be due to a bug in this adapter.  (If you get stumped, reach out at https://sailsjs.com/support.)"`
         )
       );
