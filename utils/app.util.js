@@ -123,7 +123,7 @@ module.exports = {
       attributes.map(attr => {
         if (lSRangeKeys.indexOf(attr.columnName) !== -1 &&
         !AttributeDefinitions.find(({AttributeName}) =>
-          AttributeName === attr.columnName
+        AttributeName === attr.columnName
         )) {
           let { type, columnName } = attr;
           AttributeDefinitions.push({
