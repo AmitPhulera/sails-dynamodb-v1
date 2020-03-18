@@ -60,7 +60,7 @@ module.exports = {
   // Default datastore configuration.
   defaults: {},
 
-  addProvider: async function(accessKeyId, secretAccessKey, region) {
+  addProvider: async function(accessKeyId, secretAccessKey) {
     const providerChain = new AWS.CredentialProviderChain();
     if (!!accessKeyId && !! secretAccessKey) {
       providerChain.providers = [
@@ -70,21 +70,21 @@ module.exports = {
     }
 
     try {
-      const credentialProvider = await providerChain.resolvePromise();
-      AWS.config.update({
-        credentialProvider,
-        region,
-      });
+      const credentials = await providerChain.resolvePromise();
+      return credentials;
     } catch (err) {
       console.log(`Unable to get credential providers: ${err.message}`);
     }
+    return null;
   },
 
   updateCredentials: async function(datastoreConfig) {
     const { accessKeyId, secretAccessKey, region, url } = datastoreConfig;
-    await this.addProvider(accessKeyId, secretAccessKey, region);
+    const credentials = await this.addProvider(accessKeyId, secretAccessKey);
 
     dynamoDb = new AWS.DynamoDB({
+      credentials,
+      region,
       endpoint: url
     });
     client = new AWS.DynamoDB.DocumentClient({ service: dynamoDb });
