@@ -60,22 +60,33 @@ module.exports = {
   // Default datastore configuration.
   defaults: {},
 
-  updateCredentials: function(datastoreConfig) {
-    const { accessKeyId, secretAccessKey, region, useRole, url } = datastoreConfig;
-    let credObj = {
-      region
-    };
-    if (url) {
-      credObj.endpoint = url;
+  addProvider: async function(accessKeyId, secretAccessKey, region) {
+    const providerChain = new AWS.CredentialProviderChain();
+    if (!!accessKeyId && !! secretAccessKey) {
+      providerChain.providers = [
+        new AWS.Credentials(accessKeyId, secretAccessKey),
+        ...providerChain.providers,
+      ];
     }
-    if (!useRole) {
-      credObj = {
-        ...credObj,
-        accessKeyId,
-        secretAccessKey,
-      };
+
+    try {
+      const credentialProvider = await providerChain.resolvePromise();
+      AWS.config.update({
+        credentialProvider,
+        region,
+      });
+    } catch (err) {
+      console.log(`Unable to get credential providers: ${err.message}`);
     }
-    dynamoDb = new AWS.DynamoDB(credObj);
+  },
+
+  updateCredentials: async function(datastoreConfig) {
+    const { accessKeyId, secretAccessKey, region, url } = datastoreConfig;
+    await this.addProvider(accessKeyId, secretAccessKey, region);
+
+    dynamoDb = new AWS.DynamoDB({
+      endpoint: url
+    });
     client = new AWS.DynamoDB.DocumentClient({ service: dynamoDb });
   },
   //  ╔═╗═╗ ╦╔═╗╔═╗╔═╗╔═╗  ┌─┐┬─┐┬┬  ┬┌─┐┌┬┐┌─┐
@@ -146,17 +157,6 @@ module.exports = {
         )
       );
     }
-    if (
-      !datastoreConfig.useRole &&
-      (!datastoreConfig.accessKeyId ||
-      !datastoreConfig.secretAccessKey)
-    ) {
-      return done(
-        new Error(
-          'Improper configuration of Dynamo Adaptor.\naccessKeyId or secretAccessKey missing\n.Please verfiy your settings in config/datastores.js   '
-        )
-      );
-    }
     if (!datastoreConfig.region) {
       return done(
         new Error(
@@ -164,7 +164,7 @@ module.exports = {
         )
       );
     }
-    this.updateCredentials(datastoreConfig);
+    await this.updateCredentials(datastoreConfig);
     try {
       registeredDatastores[datastoreName] = {};
       const tableList = await dynamoDb.listTables().promise();
